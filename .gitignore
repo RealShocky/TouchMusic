@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+.pytest_cache/
+vendor/
+data/
+*.log
+.env
+.env.*
+!.env.example
+*.touchmusic
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+outputs/
