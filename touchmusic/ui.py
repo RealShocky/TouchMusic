@@ -28,6 +28,13 @@ from .setlist_dialog import SetlistDialog
 from .precision import GesturePrecision
 from .precision_dialog import PrecisionDialog
 from .stage import StageView
+from .audio_setup import AudioSetup
+from .macros import MacroBank, MACRO_ACTIONS
+from .macro_dialog import MacroDialog
+from .comparison import VoiceComparison
+from .plugin_dialog import PluginDialog
+from .workspaces import Workspaces
+from .bridge_dialog import BridgeDialog
 
 EFFECT_TARGETS = ['None', 'Reverb', 'Delay', 'Harmony', 'Robot', 'Pitch', 'Gain',
                   'Chorus', 'Drive', 'Radio', 'Octave', 'Tremolo', 'Warmth',
@@ -35,7 +42,8 @@ EFFECT_TARGETS = ['None', 'Reverb', 'Delay', 'Harmony', 'Robot', 'Pitch', 'Gain'
                   'Track level', 'Master level', 'Tune strength', 'Retune speed', 'Chord level',
                   'Formant', 'Vibrato', 'Tempo', 'Overdub feedback', 'Loop edge fade',
                   'Count-in bars', 'Capture length', 'Song key', 'Chord selection',
-                  *(f'Loop {i} level' for i in range(1, LOOP_COUNT + 1)), *MIDI_LEVELS]
+                  *(f'Loop {i} level' for i in range(1, LOOP_COUNT + 1)),
+                  *(f'Plugin knob {i}' for i in range(1, 9)), *MIDI_LEVELS]
 VOICE_SLOTS = [f'Voice {number}' for number in range(1, 6)]
 BUILTIN_PRESETS = {
     'Clean': {}, 'Space': {'reverb': 65, 'delay': 35},
@@ -57,8 +65,9 @@ ACTIONS = ['None', *VOICE_SLOTS, 'Next voice', 'Previous voice', 'Loop', *LOOP_A
            'Next loop', 'Previous loop', 'Mute output', 'AI conversion', 'Dialogue mode',
            'Play / pause track', 'Restart track', 'Record performance', *BUILTIN_PRESETS,
            *CHORD_ACTIONS, 'Next chord', 'Previous chord', 'Toggle chords', 'Toggle Auto-Tune',
-           'Toggle dry monitoring', 'Undo selected loop', 'Redo selected loop', 'Overdub selected loop',
-           'Next song', 'Previous song', 'Toggle overdub mode', 'Next capture length', 'Next count-in',
+           'Toggle dry monitoring', 'Reverse selected loop', 'Half-speed selected loop',
+           'Double-speed selected loop', 'Normal selected loop', 'Stutter selected loop', 'Undo selected loop', 'Redo selected loop', 'Overdub selected loop',
+           *MACRO_ACTIONS, 'Next song', 'Previous song', 'Toggle overdub mode', 'Next capture length', 'Next count-in',
            'Freeze movements', 'Emergency mute', 'Toggle stage view', 'Toggle metronome', 'Tap tempo', *MIDI_ACTIONS]
 EFFECT_DEFAULTS = {'gain': 70, 'aimix': 100, 'delaytime': 300, 'feedback': 29}
 TARGET_KEYS = {'AI mix': 'aimix', 'Delay time': 'delaytime', 'Master level': 'master',
@@ -159,6 +168,12 @@ class MainWindow(QMainWindow):
             except (ValueError, OSError):
                 pass
         self.saved_presets = self.settings.get('presets', {})
+        self.routing_profiles = self.settings.get('routing_profiles', {})
+        self.macro_bank = MacroBank([*ACTIONS, *[SCENE_PREFIX + name for name in self.saved_presets]])
+        try:
+            self.macro_bank.load(self.settings.get('macros', {}))
+        except ValueError:
+            pass
         self.recovery = SessionRecovery(DATA / 'recovery')
         self.recovery_pending = self.recovery.recovery_available
         self.recovery_fingerprint = None
@@ -184,6 +199,12 @@ class MainWindow(QMainWindow):
         self.session_menu.addAction('Save skit…', self.save_skit)
         self.session_menu.addAction('Setlist…', self.open_setlist)
         self.session_menu.addAction('Stage view (F11)', self.open_stage)
+        self.session_menu.addAction('Audio setup and diagnostics', self.open_audio_setup)
+        self.session_menu.addAction('Gesture macros', self.open_macros)
+        self.session_menu.addAction('Voice comparison lab', self.open_comparison)
+        self.session_menu.addAction('VST3 effect rack', self.open_plugins)
+        self.session_menu.addAction('VST3 control bridge', self.open_bridge)
+        self.session_menu.addAction('Recovery history', self.recovery_history)
         self.session_menu.addAction('Test output', self.test_output)
         self.session_menu.addAction('Emergency mute (F12)', self.emergency_mute)
         self.session_menu.addSeparator()
@@ -413,13 +434,61 @@ class MainWindow(QMainWindow):
         self.refresh_voices()
         if self.recovery_pending:
             self.notice.setText('An unfinished session has a recovery backup. Recover it or choose Use current session.')
+        self.comparison = VoiceComparison(self)
+        self.bridge_dialog = BridgeDialog(self)
+        self.plugin_dialog = PluginDialog(self)
+        if isinstance(self.settings.get('plugins'), dict) and self.settings['plugins'].get('effects'):
+            try:
+                self.engine.rack.validate(self.settings['plugins'])
+                self.plugin_dialog.pending = self.settings['plugins']
+            except ValueError as exc:
+                self.notice.setText('Saved plugin rack needs attention: '+str(exc))
+        self.audio_setup = AudioSetup(self)
+        self.macro_dialog = MacroDialog(self)
         self.stage_view = StageView(self)
+        performance_page = self.takeCentralWidget()
+        self.workspaces = Workspaces(self, performance_page, [
+            ('Voice lab', self.comparison), ('FX rack', self.plugin_dialog), ('Songs', self.setlist_dialog),
+            ('Gestures', self.gesture_dialog), ('Macros', self.macro_dialog), ('Music & chords', self.music_dialog),
+            ('Audio setup', self.audio_setup), ('MIDI / DAW', self.midi_dialog), ('VST3 bridge', self.bridge_dialog)])
+        self.setCentralWidget(self.workspaces)
+        self.resize(1460, 960)
+        self.build_menu_bar()
         self.panic_shortcut = QShortcut(QKeySequence('F12'), self)
         self.panic_shortcut.setContext(Qt.ApplicationShortcut)
         self.panic_shortcut.activated.connect(self.emergency_mute)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.timer.start(100)
+
+    def build_menu_bar(self):
+        file_menu = self.menuBar().addMenu('File')
+        file_menu.addAction('Open skit...', self.open_skit)
+        file_menu.addAction('Save skit...', self.save_skit)
+        file_menu.addAction('Setlists', self.open_setlist)
+        file_menu.addAction('Recovery history', self.recovery_history)
+        file_menu.addSeparator()
+        file_menu.addAction('Exit', self.close)
+        view = self.menuBar().addMenu('View')
+        view.addAction('Performance', lambda: self.workspaces.open('Perform'))
+        view.addAction('Stage view', self.open_stage)
+        audio = self.menuBar().addMenu('Audio')
+        audio.addAction('Setup and diagnostics', self.open_audio_setup)
+        audio.addAction('Start / stop audio', self.toggle_audio)
+        audio.addAction('Test output', self.test_output)
+        audio.addAction('Emergency mute (F12)', self.emergency_mute)
+        tools = self.menuBar().addMenu('Tools')
+        tools.addAction('Voice comparison lab', self.open_comparison)
+        tools.addAction('VST3 effect rack', self.open_plugins)
+        tools.addAction('Gesture macros', self.open_macros)
+        tricks = tools.addMenu('Loop playback')
+        for label, command in [('Reverse', 'reverse'), ('Half speed (pitch changes)', 'half'),
+                               ('Double speed (pitch changes)', 'double'), ('Toggle eighth-note stutter', 'stutter'),
+                               ('Normal playback', 'normal')]:
+            tricks.addAction(label, lambda checked=False, action=command: self.loop_command(action))
+        tools.addAction('Gesture precision', self.open_precision)
+        tools.addAction('MIDI / FL Studio', self.open_midi_dialog)
+        tools.addAction('VST3 control bridge', self.open_bridge)
 
     def button(self, text, callback, layout, checkable=False):
         button = QPushButton(text)
@@ -639,15 +708,18 @@ class MainWindow(QMainWindow):
         self.music_dialog = dialog
 
     def open_music_tools(self):
+        self.workspaces.open('Music & chords')
         self.music_dialog.show()
         self.music_dialog.raise_()
 
     def open_midi_dialog(self):
         self.midi_dialog.refresh()
+        self.workspaces.open('MIDI / DAW')
         self.midi_dialog.show()
         self.midi_dialog.raise_()
 
     def open_setlist(self):
+        self.workspaces.open('Songs')
         self.setlist_dialog.show()
         self.setlist_dialog.raise_()
 
@@ -738,6 +810,7 @@ class MainWindow(QMainWindow):
         self.precision_dialog.apply_settings(self.settings.get('gesture_precision', {}))
 
     def open_gesture_dialog(self):
+        self.workspaces.open('Gestures')
         self.gesture_dialog.show()
         self.gesture_dialog.raise_()
         self.gesture_dialog.activateWindow()
@@ -768,6 +841,17 @@ class MainWindow(QMainWindow):
                     slider.setValue(BUILTIN_PRESETS[name].get(key, EFFECT_DEFAULTS.get(key, 0)))
 
     def apply_performance(self, saved):
+        if isinstance(saved.get('plugins'), dict):
+            if self.engine.rack.apply_values(saved['plugins']):
+                self.plugin_dialog.pending = None
+            else:
+                for slot in self.engine.rack.slots:
+                    slot['bypass'] = True
+                self.plugin_dialog.pending = saved['plugins']
+                self.notice.setText('Saved plugin rack awaits review in FX rack. Existing effects bypassed.')
+        self.update_macro_actions()
+        if 'macros' in saved:
+            self.macro_bank.load(saved['macros'])
         for key, value in saved.get('effects', {}).items():
             if key in self.sliders and type(value) is int:
                 self.sliders[key].setValue(value)
@@ -782,6 +866,11 @@ class MainWindow(QMainWindow):
         for track, level in zip(self.engine.loops, saved.get('loop_levels', [])):
             if type(level) is int:
                 track.gain = max(0, min(100, level)) / 100
+        for track, playback in zip(self.engine.loops, saved.get('loop_playback', [])):
+            if isinstance(playback, dict) and not track.recording:
+                track.speed = playback.get('speed', 1.) if playback.get('speed', 1.) in (.5, 1., 2.) else 1.
+                track.reverse = bool(playback.get('reverse', False))
+                track.stutter_size = 0
         self.sync_loop_level()
         for key, action in saved.get('mapping', {}).items():
             if key in self.mappings and isinstance(action, str):
@@ -804,6 +893,7 @@ class MainWindow(QMainWindow):
             self.notice.setText('Choose a name different from the built-in presets.')
             return
         self.saved_presets[name] = self.performance_settings()
+        self.update_macro_actions()
         if index < 0:
             self.preset_combo.addItem(name)
             for selector in self.gesture_selectors:
@@ -830,9 +920,12 @@ class MainWindow(QMainWindow):
             'dialogue': self.dialogue.isChecked(),
             'track_level': self.track_volume.value(),
             'loop_levels': [round(track.gain * 100) for track in self.engine.loops],
+            'loop_playback': [{'speed': track.speed, 'reverse': track.reverse} for track in self.engine.loops],
             'music': music,
             'midi': self.midi_dialog.settings(),
             'gesture_precision': self.precision_dialog.settings(),
+            'macros': self.macro_bank.settings(),
+            'plugins': self.plugin_dialog.pending if self.plugin_dialog.pending is not None else self.engine.rack.settings(),
         }
 
     def save_skit(self):
@@ -960,7 +1053,8 @@ class MainWindow(QMainWindow):
     def save_settings(self):
         self.settings = {**self.performance_settings(), 'presets': self.saved_presets,
                          'input': self.inputs.currentText(), 'output': self.outputs.currentText(),
-                         'setlist_file': str(self.setlist_dialog.path or '')}
+                         'setlist_file': str(self.setlist_dialog.path or ''),
+                         'routing_profiles': self.routing_profiles}
         save_json(self.settings_path, self.settings)
 
     def refresh_devices(self):
@@ -1018,6 +1112,9 @@ class MainWindow(QMainWindow):
                 if recorder:
                     self.show_recording_result(recorder)
             else:
+                if self.engine.converter and self.engine.converter.audition_busy:
+                    self.notice.setText('Wait for the voice comparison to finish before starting audio.')
+                    return
                 if self.inputs.currentData() is None or self.outputs.currentData() is None:
                     raise ValueError('Select an available microphone and output.')
                 self.engine.start(self.inputs.currentData(), self.outputs.currentData())
@@ -1283,6 +1380,81 @@ class MainWindow(QMainWindow):
         return (f'{NOTES[params["key"]]} {params["scale"]} | {params["bpm"]} BPM | '
                 f'Chord {DEGREES[params["chord"]]} | {self.beat_status.text()}')
 
+    def update_macro_actions(self):
+        self.macro_bank.allowed = frozenset([*ACTIONS, *[SCENE_PREFIX + name for name in self.saved_presets]]) - set(MACRO_ACTIONS) - {'None'}
+
+    def open_macros(self):
+        self.update_macro_actions()
+        self.macro_dialog.refresh()
+        self.workspaces.open('Macros')
+        self.macro_dialog.show()
+        self.macro_dialog.raise_()
+
+    def open_comparison(self):
+        self.workspaces.open('Voice lab')
+        self.comparison.show()
+        self.comparison.raise_()
+
+    def open_bridge(self):
+        self.workspaces.open('VST3 bridge')
+
+    def apply_bridge_packet(self, packet, tempo, automation, transport):
+        host_bpm = packet.get('tempo')
+        if tempo and packet.get('timing_valid') is True and host_bpm is not None and 40 <= host_bpm <= 240:
+            self.music_controls['bpm'].setValue(round(host_bpm))
+            self.engine.params['bpm'] = host_bpm
+            if self.engine.stream and packet.get('ppq') is not None:
+                self.engine.commands.put(('host_sync', (host_bpm, packet['ppq'], packet['received_at'], packet['playing'])))
+        if automation:
+            values = packet['parameters']
+            for key, value in zip(('reverb', 'delay', 'robot', 'pitch', 'tune', 'master', 'formant'), values):
+                control = self.sliders[key]
+                control.setValue(round(control.minimum()+value*(control.maximum()-control.minimum())))
+            self.gesture_action(f'Voice {min(5, 1+round(values[7]*4))}', 'DAW')
+            self.music_controls['chord'].setCurrentIndex(min(6, round(values[8]*6)))
+        if transport and packet.get('sample_position') is not None and packet.get('sample_rate'):
+            position = max(0, round(packet['sample_position']*RATE/packet['sample_rate']))
+            track = self.engine.track
+            with track.lock:
+                if abs(position-track.position) > RATE//4 or not packet['playing']:
+                    track.position = min(position, len(track.audio))
+                track.playing = packet['playing'] and track.position < len(track.audio)
+
+    def open_plugins(self):
+        self.plugin_dialog.refresh()
+        self.workspaces.open('FX rack')
+        self.plugin_dialog.show()
+        self.plugin_dialog.raise_()
+
+    def open_audio_setup(self):
+        self.workspaces.open('Audio setup')
+        self.audio_setup.show()
+        self.audio_setup.raise_()
+
+    def recovery_history(self):
+        if self.engine.recorder or any(loop.recording for loop in self.engine.loops):
+            self.notice.setText('Finish recording before restoring a snapshot.')
+            return
+        paths, labels = [], []
+        for path in self.recovery.snapshots():
+            try:
+                stamp = datetime.fromtimestamp(path.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+            except OSError:
+                continue
+            paths.append(path)
+            labels.append(f'{len(paths)}. {path.stem} - {stamp}')
+        if not paths:
+            self.notice.setText('No recovery snapshots are available yet.')
+            return
+        choice, accepted = QInputDialog.getItem(self, 'Recovery history', 'Choose a completed snapshot', labels, 0, False)
+        if accepted:
+            try:
+                self.apply_session(*self.recovery.load_recovery(paths[labels.index(choice)]))
+                self.use_current_session()
+                self.notice.setText('Snapshot restored. Start audio when ready.')
+            except Exception as exc:
+                self.notice.setText('Could not restore snapshot: ' + str(exc))
+
     def open_stage(self):
         self.stage_view.refresh()
         self.stage_view.show()
@@ -1294,6 +1466,9 @@ class MainWindow(QMainWindow):
 
     def gesture_level(self, target, value):
         if self.rehearse.isChecked():
+            return
+        if target.startswith('Plugin knob '):
+            self.engine.rack.control(int(target.split()[-1]), value)
             return
         if target.startswith('MIDI CC '):
             self.midi.control(int(target.removeprefix('MIDI CC ')), value)
@@ -1335,6 +1510,11 @@ class MainWindow(QMainWindow):
             index = self.loop_select.currentIndex()
         else:
             self.loop_select.setCurrentIndex(index)
+        track = self.engine.loops[index]
+        if action in ('loop', 'overdub') and track.clip is not None and (action == 'overdub' or self.engine.params['loop_mode'] == 'Overdub'):
+            if track.speed != 1 or track.reverse or track.stutter_size:
+                self.notice.setText('Return this loop to Normal playback before overdubbing.')
+                return
         self.engine.commands.put((action, index))
         if not self.engine.stream:
             self.engine.apply_loop_commands()
@@ -1361,7 +1541,11 @@ class MainWindow(QMainWindow):
             return
         if action != 'None':
             self.gesture_preview.setText(f'{pose}: {action}')
-        if action in MIDI_ACTIONS:
+        if action in MACRO_ACTIONS:
+            if not self.macro_bank.definitions.get(action):
+                self.notice.setText('Configure this slot in Session > Gesture macros first.')
+            self.macro_bank.run(action, self.gesture_action)
+        elif action in MIDI_ACTIONS:
             if action == 'MIDI panic':
                 self.midi.panic()
             else:
@@ -1394,6 +1578,11 @@ class MainWindow(QMainWindow):
             self.stage_view.hide() if self.stage_view.isVisible() else self.open_stage()
         elif action == 'Loop':
             self.toggle_loop()
+        elif action in ('Reverse selected loop', 'Half-speed selected loop', 'Double-speed selected loop',
+                        'Normal selected loop', 'Stutter selected loop'):
+            command = {'Reverse': 'reverse', 'Half-speed': 'half', 'Double-speed': 'double',
+                       'Normal': 'normal', 'Stutter': 'stutter'}[action.split()[0]]
+            self.loop_command(command)
         elif action == 'Undo selected loop':
             self.loop_command('undo')
         elif action == 'Overdub selected loop':
@@ -1500,6 +1689,9 @@ class MainWindow(QMainWindow):
             self.notice.setText(f'Recording saved. Dropped audio blocks: {recorder.dropped}.')
 
     def tick(self):
+        self.bridge_dialog.poll()
+        if self.plugin_dialog.isVisible():
+            self.plugin_dialog.select_parameter(self.plugin_dialog.parameter.currentText())
         self.calibration_tick()
         self.midi.tick()
         self.backup_session()
@@ -1542,6 +1734,8 @@ class MainWindow(QMainWindow):
             else:
                 status = 'Empty'
                 state = ''
+            if clip is not None and not loop.recording:
+                status += (' REV' if loop.reverse else '') + (f' {loop.speed:g}x' if loop.speed != 1 else '') + (' STUTTER' if loop.stutter_size else '')
             pad.setText(f'Loop {index+1}  ·  {status}')
             if pad.property('loopState') != state:
                 pad.setProperty('loopState', state)
@@ -1588,8 +1782,9 @@ class MainWindow(QMainWindow):
         recording = '  |  Recording' if self.engine.recorder else ''
         audio = 'Audio on' if self.engine.stream else 'Audio off'
         gestures = 'Gestures armed' if self.arm.isChecked() else 'Gestures off'
+        pending_fx = '  |  FX rack awaits review' if self.plugin_dialog.pending is not None else ''
         self.music_status.setText(f"{voice['name'] if voice else 'No voice selected'}  |  {NOTES[p['key']]} {p['scale']}  |  "
-                                  f"{chord_text}  |  {p['monitor']}  |  {audio}  |  {gestures}{recording}")
+                                  f"{chord_text}  |  {p['monitor']}  |  {audio}  |  {gestures}{recording}{pending_fx}")
         if self.engine.error:
             self.notice.setText('Audio error: ' + self.engine.error)
         if self.stage_view.isVisible():
@@ -1605,6 +1800,10 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.stage_view.hide()
+        self.bridge_dialog.server.close()
+        self.comparison.cancel()
+        self.comparison.player.stop()
+        self.audio_setup.timer.stop()
         self.timer.stop()
         self.midi.close()
         self.engine.stop()

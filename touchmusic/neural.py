@@ -115,6 +115,9 @@ class StreamingConverter:
         self.factory = factory or (lambda: SeedSingingBackend(progress=self.report_progress))
         self.lock = threading.RLock()
         self.requests = queue.Queue(maxsize=2)
+        self.audition_requests = queue.Queue(maxsize=1)
+        self.audition_busy = False
+        self.audition_job = None
         self.results = queue.Queue(maxsize=4)
         self.reference = None
         self.generation = 0
@@ -175,6 +178,17 @@ class StreamingConverter:
             previous_end_frame = None
             tail = np.zeros(self.overlap, np.float32)
             while not self.closed:
+                try:
+                    job = self.audition_requests.get_nowait()
+                except queue.Empty:
+                    job = None
+                if job is not None:
+                    job.run(backend)
+                    self.audition_busy = False
+                    self.reset()
+                    self.ready = False
+                    previous = previous_end_frame = None
+                    continue
                 reference = self.reference
                 if reference:
                     if backend.reference_path != reference:
@@ -221,6 +235,19 @@ class StreamingConverter:
             self.status = 'Singing engine error: ' + str(exc)
             self.ready = False
             traceback.print_exc()
+
+    def submit_audition(self, audio, variants):
+        from .audition import AuditionJob
+        with self.lock:
+            if self.closed or self.error or self.audition_busy or not self.ready:
+                raise RuntimeError('Wait for the singing engine to be ready and the current comparison to finish.')
+            job = AuditionJob(audio, variants)
+            self.audition_busy = True
+            self.audition_job = job
+            self.ready = False
+            self.reset()
+            self.audition_requests.put_nowait(job)
+            return job
 
     def process(self, audio, mix=1., start_frame=None):
         """Return playback audio and expose its capture provenance in source_frames.
@@ -279,3 +306,5 @@ class StreamingConverter:
 
     def close(self):
         self.closed = True
+        if self.audition_job and not self.audition_job.done.is_set():
+            self.audition_job.cancel.set()

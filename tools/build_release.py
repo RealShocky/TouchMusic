@@ -12,9 +12,10 @@ OUTPUT = ROOT / 'dist'
 def main():
     OUTPUT.mkdir(exist_ok=True)
     source_files = [ROOT / name for name in ('README.md', 'Setup.cmd', 'Launch.cmd',
-                    'prepare_seed.py', 'pyproject.toml', 'MANIFEST.in', 'requirements.txt', 'THIRD_PARTY_NOTICES.md')]
+                    'prepare_seed.py', 'roadmap.md', 'release-notes.md', 'pyproject.toml', 'MANIFEST.in', 'requirements.txt', 'THIRD_PARTY_NOTICES.md')]
     source_files.extend((ROOT / 'touchmusic').glob('*.py'))
     source_files.extend((ROOT / 'touchmusic').glob('*.txt'))
+    source_files.extend(path for path in (ROOT / 'native/control_bridge').glob('*') if path.is_file())
     archive = OUTPUT / f'TouchMusic-{VERSION}-Windows-Setup.zip'
     with ZipFile(archive, 'w', ZIP_DEFLATED) as zipped:
         for file in sorted(source_files):

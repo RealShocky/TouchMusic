@@ -20,7 +20,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test:
+    uses: ./.github/workflows/tests.yml
+  native:
+    uses: ./.github/workflows/native-bridge.yml
   build:
+    needs: [test, native]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,6 +45,10 @@ jobs:
           cd /tmp
           touchmusic --version
           touchmusic --help
+      - uses: actions/download-artifact@v4
+        with:
+          name: touchmusic-native-windows
+          path: dist/
       - name: Build Windows setup ZIP and checksums
         run: python tools/build_release.py
       - name: Reuse exact published distributions on rerun

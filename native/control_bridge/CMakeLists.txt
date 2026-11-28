@@ -30,3 +30,7 @@ endif()
 smtg_target_configure_version_file(TouchMusicControlBridge)
 smtg_target_set_bundle(TouchMusicControlBridge BUNDLE_IDENTIFIER "com.touchmusic.controlbridge"
     COMPANY_NAME "TouchMusic")
+if(MSVC)
+    target_compile_options(TouchMusicControlBridge PRIVATE /Z7)
+    target_link_options(TouchMusicControlBridge PRIVATE /DEBUG:NONE)
+endif()

@@ -66,3 +66,22 @@ def test_overdub_and_capture_commands_cancel_the_same_pending_count_in():
     assert not engine.clock.pending
     assert not engine.loop.recording
 
+def test_loop_reverse_varispeed_and_stutter_preserve_source_and_restore_normal():
+    import numpy as np
+    from touchmusic.audio import LoopTrack
+    track = LoopTrack(48000)
+    clip = np.arange(8, dtype=np.float32)
+    track.load(clip)
+    track.reverse = True
+    np.testing.assert_array_equal(track.process(np.zeros(8)), clip[::-1])
+    track.reverse = False
+    track.speed = .5
+    output = track.process(np.zeros(8))
+    np.testing.assert_array_equal(output, np.arange(8)*.5)
+    track.start_overdub()
+    assert not track.recording
+    track.speed = 1
+    track.stutter_origin, track.stutter_size = 2, 2
+    np.testing.assert_array_equal(track.process(np.zeros(6)), [2, 3, 2, 3, 2, 3])
+    np.testing.assert_array_equal(track.clip, clip)
+

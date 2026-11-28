@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import threading
 import time
+import shutil
 import numpy as np
 from .project import save_project, load_project
 
@@ -37,6 +38,8 @@ class SessionRecovery:
     Archive publication occurs only after load_project validates the new file.
     recovery_available describes the prior shutdown, captured at construction.
     """
+    HISTORY_COUNT = 5
+    HISTORY_BYTES = 256 * 1024 * 1024
     def __init__(self, directory):
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -88,7 +91,18 @@ class SessionRecovery:
                 temporary = Path(name)
                 save_project(temporary, *snapshot)
                 load_project(temporary)
+                if self.archive_path.is_file():
+                    history = self.directory / 'history'
+                    history.mkdir(exist_ok=True)
+                    destination = history / f'{time.time_ns()}.touchmusic'
+                    stage = destination.with_suffix('.tmp')
+                    try:
+                        shutil.copy2(self.archive_path, stage)
+                        os.replace(stage, destination)
+                    finally:
+                        stage.unlink(missing_ok=True)
                 os.replace(temporary, self.archive_path)
+                self._prune_history()
             except Exception as exc:
                 failure = str(exc) or type(exc).__name__
             finally:
@@ -101,9 +115,28 @@ class SessionRecovery:
                     self.saved_revision = revision
                 self._condition.notify_all()
 
-    def load_recovery(self):
+    def _prune_history(self):
+        total = 0
+        for index, path in enumerate(sorted((self.directory / 'history').glob('*.touchmusic'), reverse=True)):
+            try:
+                total += path.stat().st_size
+                if index >= self.HISTORY_COUNT or total > self.HISTORY_BYTES:
+                    path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    def snapshots(self):
+        paths = [self.archive_path, *sorted((self.directory / 'history').glob('*.touchmusic'), reverse=True)]
+        return [path for path in paths if path.is_file()]
+
+    def load_recovery(self, path=None):
         """Return validated (settings, assets, voices), without extracting files."""
-        return load_project(self.archive_path)
+        path = self.archive_path if path is None else Path(path)
+        resolved = path.resolve()
+        if resolved != self.archive_path.resolve() and (
+                resolved.parent != (self.directory / 'history').resolve() or resolved.suffix != '.touchmusic'):
+            raise ValueError('Choose a recovery snapshot from this session directory.')
+        return load_project(path)
 
     def flush(self, timeout=5.):
         """Wait for the latest submitted revision; False means timeout or failure."""

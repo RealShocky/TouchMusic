@@ -38,7 +38,7 @@ Download the Windows setup ZIP from [Releases](https://github.com/RealShocky/Tou
 
 The release also includes an installable wheel. With Python 3.11, install it directly:
 
-    py -3.11 -m pip install https://github.com/RealShocky/TouchMusic/releases/download/v0.3.0/touchmusic-0.3.0-py3-none-any.whl
+    py -3.11 -m pip install https://github.com/RealShocky/TouchMusic/releases/download/v0.4.0/touchmusic-0.4.0-py3-none-any.whl
     touchmusic
 
 For character conversion, run the optional engine setup once:
@@ -287,3 +287,43 @@ Live FL Studio routing and hardware timing remain under test. These additions wo
 - **Session > Test output** plays a quiet 440 Hz tone for 0.8 seconds through the selected output after audio is started. The tone obeys output mute and master level and is excluded from recorded mixes, stems, and loop capture. This verifies playback by listening, not an automatic device loopback measurement.
 
 Gesture precision and stage controls are covered by automated tests. Camera comfort, tracking consistency, audible hardware output, and DAW routing still need live validation.
+
+## Studio workspaces (0.4.0)
+
+TouchMusic now has a menu bar and ten sidebar workspaces: Perform, Voice lab, FX rack, Songs, Gestures, Macros, Music & chords, Audio setup, MIDI / DAW, and VST3 bridge. The stage window remains available separately. Existing Session menu actions still work.
+
+### Guided audio setup and diagnostics
+
+Open **Audio setup**, choose compatible microphone/output devices, Apply and start audio, speak to check Input, then play the output test. Confirm hearing the tone yourself. Named routing profiles save device names; unavailable devices are reported instead of silently substituting a saved profile. The readable health summary shows clipping, audio status events, plugin failures, and AI backlog. The optional technical report can be copied or exported locally. Driver latency is reported, not measured by a hardware loopback test.
+
+### Gesture macros
+
+Use **Macros** to save up to eight actions in each of eight slots, then map a pose to Macro 1..8. Actions execute in order immediately. Loop, chord, and playback commands retain their own beat/bar scheduling. Model reference preparation can add delay. Nested macros are rejected, and Emergency mute stops the remaining macro actions. Saved scenes can be macro actions. Definitions travel with presets, skits, settings, and recovery.
+
+### Voice comparison lab
+
+Stop main audio, load the singing engine and a reference, then open **Voice lab**. Choose source audio, a start time and 1..8 second length, then choose A/B voice references and Live/Studio quality. Render comparison uses the existing model worker serially, with bounded context chunks rather than loading another GPU model. Preview dry/A/B on the explicitly selected preview output, or export floating-point WAVs. Main audio cannot start during rendering. Cancellation waits for the current model chunk. The same source phrase makes comparison easier; displayed render time, RMS and overload fractions do not constitute an objective voice-similarity score. Model quality still needs listening tests.
+
+### VST3 effects
+
+Open **FX rack**, stop audio, and load a trusted installed 64-bit VST3 audio effect file or bundle. Up to four effects process in order after built-in vocal effects and before vocal gain/loop capture. Dialogue mode bypasses the rack. Stereo effect output is folded to the current mono vocal bus. Instruments, sidechains, native plugin editors, and separate stereo outputs are not supported in this first rack.
+
+Select a normalized parameter and bind it to Plugin knob 1..8, then map hand movement to that knob. Bypass/reorder/remove controls and normalized parameter snapshots are provided. A skit's native rack requires explicit review and Restore saved rack; it never loads third-party native code automatically. Plugins must remain installed at their saved paths. Snapshots preserve exposed parameters, not opaque plugin presets. Native plugins run inside the process; crash isolation remains roadmap work. Python exceptions or invalid returned audio bypass the failing slot and appear in diagnostics.
+
+Publisher download links are available inside the rack. Useful free candidates include [TDR Nova](https://www.tokyodawn.net/tdr-nova/free/) for dynamic EQ, [Valhalla Supermassive](https://valhalladsp.com/shop/reverb/valhalla-supermassive/) for delay/reverb, and [MFreeFXBundle](https://www.meldaproduction.com/MFreeFXBundle). Install the VST3 version from its publisher. Plugins are not redistributed in TouchMusic downloads. TDR Nova 2.2.3 was checked with 100 live-sized blocks and a gesture parameter update; this does not certify all presets or other plugins.
+
+### Loop performance tricks
+
+Tools > Loop playback provides reverse, half-speed, double-speed, normal playback, and toggle eighth-note stutter for the selected loop. These are also gesture actions and follow beat/bar scheduling. Half/double speed changes pitch; pitch-preserving tempo matching is still future work. Return to Normal before overdubbing. Speed and reverse settings save with the performance; temporary stutter state does not. Export loop writes the original captured clip, without live playback tricks.
+
+### Recovery history
+
+File > Recovery history lets you choose the latest completed snapshot or up to five prior snapshots, with a 256 MiB budget for prior backups. The latest backup remains separate. Restore stops audio and disarms gestures. Active recording and undo stacks are not recovered. Save important performances as skits too.
+
+### VST3 control bridge
+
+Download the separate Windows Control Bridge ZIP from the release and load the `.vst3` bundle in your DAW. Enable the opt-in receiver in **VST3 bridge**. Host automation, tempo/musical position and optional backing transport chase are available. The native plugin passes DAW audio through unchanged; processed vocals require their own audio route. See [native/control_bridge/README.md](native/control_bridge/README.md) for controls and timing limits. Live FL Studio validation is pending.
+
+### Platform support
+
+The supported release is **Windows 10/11 x64 with Python 3.11**. Python modules and native bridge source contain portable components, but macOS/Linux camera, device routing, engine installation, packaging and host validation are not certified. This is a Windows studio build, not a completed cross-platform release.

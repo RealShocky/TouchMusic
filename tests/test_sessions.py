@@ -136,3 +136,17 @@ def test_corrupt_recovery_is_offered_but_validated_before_use(tmp_path):
             session.load_recovery()
     finally:
         session.close(clean=False)
+def test_recovery_history_is_bounded_and_can_restore_prior_snapshot(tmp_path):
+    session = SessionRecovery(tmp_path)
+    session.HISTORY_COUNT = 2
+    try:
+        for bpm in (90, 100, 110, 120):
+            session.submit({'music': {'bpm': bpm}}, {})
+            assert session.flush(5)
+        snapshots = session.snapshots()
+        assert len(snapshots) == 3
+        assert session.load_recovery(snapshots[1])[0]['music']['bpm'] == 110
+        assert session.load_recovery(snapshots[2])[0]['music']['bpm'] == 100
+    finally:
+        session.close()
+

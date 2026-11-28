@@ -9,4 +9,4 @@ default_data = ROOT / 'data' if SOURCE_CHECKOUT else Path(
 DATA = Path(os.environ.get('TOUCHMUSIC_DATA_DIR', str(default_data))).expanduser().resolve()
 VENDOR = ROOT / 'vendor/seed-vc' if SOURCE_CHECKOUT else DATA / 'vendor/seed-vc'
 SEED_REVISION = '51383efd921027683c89e5348211d93ff12ac2a8'
-VERSION = '0.3.0'
+VERSION = '0.4.0'

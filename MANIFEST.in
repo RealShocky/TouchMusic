@@ -4,3 +4,9 @@ prune data
 prune vendor
 prune tests
 prune docs
+
+include roadmap.md release-notes.md
+recursive-include native/control_bridge *.cpp *.h *.md *.txt
+include tools/verify_native_bridge.py tools/build_release.py
+prune dist
+prune build

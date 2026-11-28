@@ -8,6 +8,7 @@ from .sessions import Setlist
 class SetlistDialog(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
+        self.owner = parent
         self.model = Setlist()
         self.path = None
         self.dirty = False
@@ -89,11 +90,11 @@ class SetlistDialog(QDialog):
 
     def open_index(self, index):
         path = self.model.paths[index]
-        if self.parent().load_skit_path(path):
+        if self.owner.load_skit_path(path):
             self.model.select(index)
             self.refresh()
             return True
-        self.status.setText(self.parent().notice.text())
+        self.status.setText(self.owner.notice.text())
         return False
 
     def step(self, direction):
@@ -101,7 +102,7 @@ class SetlistDialog(QDialog):
             index = max(0, min(len(self.model.paths)-1, self.model.index + direction))
             self.open_index(index)
         else:
-            self.parent().notice.setText('Add saved skits in Session > Setlist first.')
+            self.owner.notice.setText('Add saved skits in Session > Setlist first.')
 
     def open_list(self):
         if self.dirty:
@@ -135,6 +136,6 @@ class SetlistDialog(QDialog):
                 self.model.save(path)
                 self.path, self.dirty = Path(path), False
                 self.refresh()
-                self.parent().save_settings()
+                self.owner.save_settings()
             except Exception as exc:
                 self.status.setText(str(exc))

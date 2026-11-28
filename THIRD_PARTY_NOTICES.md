@@ -25,3 +25,7 @@ Users import their own audio references. This source repository contains no refe
 ## TouchMusic licensing
 
 The repository owner has not selected a license for the TouchMusic application source. Repository visibility alone does not grant an open-source license. Third-party components remain governed by their respective licenses.
+
+## Native VST3 control bridge
+
+Uses Steinberg VST3 SDK 3.8.1, pinned at 3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96, under the MIT license. The complete notice is in native/control_bridge/STEINBERG-LICENSE.txt and accompanies the native download. VST is a trademark of Steinberg Media Technologies GmbH. Third-party effect binaries used during local compatibility checks are excluded from public packages.

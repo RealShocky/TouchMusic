@@ -10,6 +10,7 @@ from .music import ChordPad, SCALES, chord_notes, nearest_note
 from .transport import BeatClock
 from .vocal import FormantShifter, VocalAnalysis, harmony_shift
 from .alignment import align_recording, mix_stems
+from .plugin_rack import PluginRack
 
 RATE = 48000
 BLOCK = 512
@@ -79,6 +80,11 @@ class LoopTrack:
         self.overdubbing = False
         self.history = []
         self.future = []
+        self.speed = 1.
+        self.reverse = False
+        self.stutter_size = 0
+        self.stutter_origin = 0
+        self.stutter_step = 0.
 
     @property
     def previous(self):
@@ -96,8 +102,9 @@ class LoopTrack:
         self.clip = clip
 
     def start_overdub(self, feedback=1.):
-        if self.recording or self.clip is None:
+        if self.recording or self.clip is None or self.speed != 1 or self.reverse or self.stutter_size:
             return
+        self.position = int(self.position)
         self.buffer = self.clip.copy()
         self.feedback = max(0., min(1., feedback))
         self.recording = self.overdubbing = True
@@ -114,6 +121,7 @@ class LoopTrack:
             self.size = len(self.clip) if self.clip is not None else 0
         else:
             self.size = 0
+            self.speed, self.reverse, self.stutter_size = 1., False, 0
             self.buffer = np.empty(self.rate * LOOP_SECONDS, np.float32)
             self.recording = True
 
@@ -159,13 +167,21 @@ class LoopTrack:
         output = np.zeros_like(audio)
         clip = self.clip
         if clip is not None:
-            indices = (np.arange(len(audio)) + self.position) % len(clip)
+            positions = np.arange(len(audio))*self.speed + self.position
+            if self.stutter_size:
+                positions = self.stutter_origin + (np.arange(len(audio))*self.speed+self.stutter_step) % self.stutter_size
+                self.stutter_step = (self.stutter_step+len(audio)*self.speed) % self.stutter_size
+            positions %= len(clip)
+            if self.reverse:
+                positions = (len(clip)-1-positions) % len(clip)
+            indices = np.floor(positions).astype(np.int64)
             if not self.muted:
-                output[:] = clip[indices]
+                fraction = positions-indices
+                output[:] = clip[indices]*(1-fraction) + clip[(indices+1) % len(clip)]*fraction
                 fade = min(round(self.seam_ms * self.rate / 1000), len(clip) // 2)
                 if fade:
                     output *= np.minimum(1., np.minimum(indices, len(clip)-1-indices) / fade)
-            self.position = int((self.position + len(audio)) % len(clip))
+            self.position = (self.position + len(audio)*self.speed) % len(clip)
         return output
 
 
@@ -327,8 +343,10 @@ class AudioEngine:
                        'count_in': 0, 'capture_bars': 0, 'loop_mode': 'Replace', 'overdub_feedback': 1.,
                        'seam_ms': 0}
         self.clock = BeatClock(RATE)
+        self.host_locked = False
         self.track, self.preview = SamplePlayer(), SamplePlayer()
         self.test_tone = SamplePlayer()
+        self.rack = PluginRack()
         self.loops = [LoopTrack(RATE) for _ in range(LOOP_COUNT)]
         self.loop = self.loops[0]
         self.commands = queue.SimpleQueue()
@@ -340,6 +358,9 @@ class AudioEngine:
         self.peak = 0.
         self.input_peak = 0.
         self.overruns = 0
+        self.input_clips = 0
+        self.callback_ms = 0.
+        self.max_callback_ms = 0.
         self.error = ''
         self.phase = 0
 
@@ -377,13 +398,40 @@ class AudioEngine:
                 boundary = self.clock.boundary('Next beat' if mode == 'Immediate' else mode)
                 frame = boundary + round(self.params['count_in'] * 4 * self.clock.period)
                 self.clock.queue_at(key, (action, index), frame, keep_beats=True)
-            elif mode != 'Immediate' and action in ('loop', 'overdub', 'restart', 'chord'):
+            elif mode != 'Immediate' and action in ('loop', 'overdub', 'restart', 'chord', 'reverse', 'half', 'double', 'normal', 'stutter'):
                 self.clock.queue_at(key, (action, index), self.clock.boundary(mode))
             else:
                 self.clock.discard(key)
                 self._apply_command(action, index)
 
     def _apply_command(self, action, index):
+        if action == 'host_sync':
+            bpm, ppq, received_at, playing = index
+            if not playing:
+                if self.host_locked:
+                    for track in self.loops:
+                        if track.recording:
+                            track.toggle()
+                    self.clock.pending.clear()
+                    self.clock.beat_targets.clear()
+                self.host_locked = False
+                return
+            self.clock.set_tempo(bpm, self.params['quantize'])
+            beat = ppq + max(0., time.monotonic()-received_at) * bpm/60
+            prior = (self.clock.frame-self.clock.origin)/self.clock.period
+            if not self.host_locked or abs(beat-prior) > 1:
+                for track in self.loops:
+                    if track.recording:
+                        track.toggle()
+                self.clock.pending.clear()
+                self.clock.beat_targets.clear()
+            self.clock.origin = round(self.clock.frame-beat*self.clock.period)
+            for key, (_, command) in self.clock.pending.items():
+                target = self.clock.beat_targets.get(key)
+                frame = self.clock.boundary(self.clock.mode) if target is None else self.clock.origin+round(target*self.clock.period)
+                self.clock.pending[key] = frame, command
+            self.host_locked = True
+            return
         if action == 'chord':
             self.params['chord'] = index
             return
@@ -418,6 +466,17 @@ class AudioEngine:
             track.undo()
         elif action == 'redo':
             track.redo()
+        elif action in ('reverse', 'half', 'double', 'normal', 'stutter') and not track.recording:
+            if action == 'reverse':
+                track.reverse = not track.reverse
+            elif action in ('half', 'double'):
+                track.speed = .5 if action == 'half' else 2.
+            elif action == 'normal':
+                track.speed, track.reverse, track.stutter_size = 1., False, 0
+            elif track.clip is not None:
+                track.stutter_origin = track.position
+                track.stutter_step = 0.
+                track.stutter_size = 0 if track.stutter_size else min(len(track.clip), round(self.clock.period/2))
 
     def tune_vocal(self, audio, p, chord, detected):
         pitch = self.analysis.pitch
@@ -468,6 +527,7 @@ class AudioEngine:
         p = self.params.copy()
         recorder = self.recorder
         self.input_peak = float(np.max(np.abs(audio)))
+        self.input_clips += int(np.count_nonzero(np.abs(audio) >= .999))
         dry = audio
         chord = chord_notes(p['key'], p['scale'], p['chord'])
         chords_follow = p['harmony'] and p['harmony_mode'] != 'Fixed fifth'
@@ -505,7 +565,7 @@ class AudioEngine:
             self.harmony_analysis.process(audio, p['vocal_range'])
             harmony_note = self.harmony_analysis.center
         interval = harmony_shift(harmony_note, chord, p['harmony_mode'])
-        vocal = (audio if p['dialogue'] else self.vocal_effects(audio, p, interval)) * p['gain']
+        vocal = (audio if p['dialogue'] else self.rack.process(self.vocal_effects(audio, p, interval), RATE)) * p['gain']
         capture = loop_mic * p['gain'] if p['loop_input'] == 'Mic before AI' else vocal
         accompaniment = np.zeros_like(audio)
         loop_stems = []
@@ -558,6 +618,7 @@ class AudioEngine:
         return vocal * (1 - p['tremolo'] * .5 * (1 - np.sin(phase * 5)))
 
     def _callback(self, inputs, outputs, frames, timing, status):
+        started = time.perf_counter()
         try:
             if status:
                 self.overruns += 1
@@ -566,6 +627,9 @@ class AudioEngine:
         except Exception as exc:
             outputs.fill(0)
             self.error = str(exc)
+        finally:
+            self.callback_ms = (time.perf_counter() - started) * 1000
+            self.max_callback_ms = max(self.max_callback_ms, self.callback_ms)
 
     def start(self, input_device, output_device):
         input_info = sd.query_devices(input_device, 'input')

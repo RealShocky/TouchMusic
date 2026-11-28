@@ -4,7 +4,7 @@ TouchMusic is a standalone vocal performance instrument with gesture control and
 
 ## Current baseline
 
-Version 0.3.0 adds gesture precision, expanded mappings, stage view, and output diagnostics. Version 0.2.0 introduced overdubbing, timed capture, reference suggestions, recovery, and setlists.
+Version 0.4.0 adds studio workspaces, guided audio setup, diagnostics, gesture macros, voice comparisons, VST3 effect hosting, a native control bridge, recovery history, and loop playback tricks. Version 0.3.0 added gesture precision, expanded mappings, stage view, and output diagnostics. Version 0.2.0 introduced overdubbing, timed capture, reference suggestions, recovery, and setlists.
 
 - Standalone desktop effects, pitch correction, voice references, and local AI conversion.
 - Reference-import player with waveform, zoom, and draggable 1–8 second selection.
@@ -19,11 +19,11 @@ Automated tests and package installation were verified during development. End-t
 
 | Priority | Work | Intended result | Completion check |
 | --- | --- | --- | --- |
-| 1 | Connection wizard | A guided MIDI and audio setup with test note, audio meters, saved routing profiles, and explicit connection status | A fresh setup can verify MIDI messages and an audio round trip and report a missing route clearly |
+| Partial in 0.4.0 | Connection wizard | A guided MIDI and audio setup with test note, audio meters, saved routing profiles, and explicit connection status | A fresh setup can verify MIDI messages and an audio round trip and report a missing route clearly |
 | 2 | Dedicated FL Studio controller profile | Gesture actions for transport, record, track selection, mixer controls, and plugin parameters through an FL controller script | Each action controls the intended FL function and provides feedback for the active target |
-| 3 | Shared tempo and transport | Select a clock master and make TouchMusic follow FL tempo, playback, and bar position | Capture and chord changes remain aligned during sustained playback and recover correctly after stop/restart |
+| Control bridge implemented; live validation pending | Shared tempo and transport | Select a clock master and make TouchMusic follow FL tempo, playback, and bar position | Capture and chord changes remain aligned during sustained playback and recover correctly after stop/restart |
 | Implemented in 0.3.0; live check pending | Gesture calibration and precision | Calibrated movement range, adjustable sensitivity, dead zones, pose timing, and a visible parameter/action overlay | Deliberate gestures work consistently while small incidental movement avoids unwanted changes |
-| Partial in 0.3.0 | Performance UI | Large active voice, key, chord and recording displays, loop progress indicators, compact mode, and clear advanced controls | Essential performance controls stay visible at supported screen sizes and normal Windows scaling |
+| Studio workspaces in 0.4.0; compact layouts pending | Performance UI | Large active voice, key, chord and recording displays, loop progress indicators, compact mode, and clear advanced controls | Essential performance controls stay visible at supported screen sizes and normal Windows scaling |
 | 6 | Recording calibration | Measure routing and conversion delay, save a profile, and apply the measured recording offset | Recorded transients align against a reference within a measured tolerance shown to the user |
 
 Clock synchronization must address tempo changes and the playback speed of existing loops. The current looper keeps existing clips at their recorded speed.
@@ -60,7 +60,7 @@ Recovery preserves completed assets, not an active take or undo history. Setlist
 
 ## Later exploration
 
-- A TouchMusic VST3 bridge with host automation and tempo synchronization.
+- Implemented experimentally in 0.4.0: a native VST3 control bridge with host automation, soft tempo/PPQ anchoring and optional backing transport chase. It passes DAW audio through unchanged. Full AI audio transport through a plugin and live FL Studio validation remain pending.
 - Separate vocal, loop, and backing outputs where the selected audio driver supports them.
 - More expressive chord voicings, chord progressions, and held-note MIDI performance.
 - Optional vocal separation before creating a reference from a mixed song.
@@ -72,7 +72,7 @@ Each release should update its version, notes, compatibility information, and ve
 - Gapless song transitions with explicit backing/loop carryover rules.
 - Per-loop pitch-preserving time stretch when the master tempo changes.
 - Implemented in 0.3.0: gesture control for capture length, overdub feedback, loop-edge treatment, tempo, key, chords, and count-in.
-- Recovery retention policy and a selectable backup history.
+- Implemented in 0.4.0: selectable recovery history, up to five prior snapshots with a 256 MiB prior-backup budget.
 - Stage view with larger controls implemented in 0.3.0; configurable displays and further compact layouts remain candidates.
 
 ## Standalone progress in 0.3.0
@@ -84,3 +84,41 @@ Each release should update its version, notes, compatibility information, and ve
 - Verified: 72 automated behavior tests, desktop layout checks, and installed package startup.
 - Pending: live webcam usability and speaker checks. The output-test tone is an audible playback aid, not an automated connection wizard or measured audio round trip.
 - FL Studio testing is paused because the application was uninstalled after failing. Resume the existing test sequence after reinstallation. No end-to-end FL connection is claimed.
+
+## Studio increment in 0.4.0
+
+- Implemented: menu bar and ten sidebar workspaces, guided standalone audio setup, named device profiles, readable diagnostics and local report export.
+- Implemented: eight gesture macro slots, up to eight immediate actions per slot. Loop/chord actions retain their own scheduling. Recursive macros are rejected.
+- Implemented: voice comparison lab, 1..8 second source phrase, two reference/quality variants, same inference worker, preview output selection, render/level metrics and WAV export.
+- Implemented: four-slot VST3 audio effect rack, generic normalized controls, eight gesture parameter bindings, bypass/order/parameter snapshots, explicit review before loading a saved native rack.
+- Implemented: reverse, half/double speed and eighth-note stutter for loops. Half/double speed changes pitch, so pitch-preserving tempo matching is still pending. Exports preserve the captured clip rather than rendering playback tricks.
+- Implemented: Windows x64 native VST3 control bridge, bounded localhost protocol, ten automation controls, soft host-clock anchoring and optional backing chase. It is a control bridge, not AI audio processing inside the DAW.
+- Verified: 85 Python behavior tests, 47 VST3 validator tests, actual VST3 hosting and native-to-Python automation, and a real TDR Nova 2.2.3 check using 100 live-sized blocks plus a gesture parameter update.
+- Live checks pending: microphone/speaker round trip, long performances, GPU voice-quality comparison by listening, hardware timing, and FL Studio after reinstallation.
+
+## Next engineering priorities
+
+| Priority | Work | Why it matters |
+| --- | --- | --- |
+| 1 | Isolated plugin worker and native editor broker | A misbehaving native effect should not take down the performance app; editors should remain responsive alongside camera gestures |
+| 2 | Full DAW audio bridge and declared latency | Route DAW input through TouchMusic and return wet audio without a separate virtual cable, with sample provenance, buffering and clock-drift handling |
+| 3 | Pitch-preserving loop time stretch | Existing loops should follow tempo changes while retaining vocal pitch; prepare changes outside the audio callback |
+| 4 | Measured audio calibration | Measure real routing delay and conversion latency, with repeatable recording alignment checks |
+| 5 | Character ensemble | Two character conversions with independent levels; benchmark GPU/memory budget and provide offline rendering before promising live dual conversion |
+| 6 | Single-instance ownership, session migrations and device hotplug | Preserve recovery integrity, migrate saved performances safely, and explain unavailable devices during a show |
+| 7 | macOS and Linux support | Implement and test platform camera backends, audio routing, singing-engine setup, packaging and native host compatibility |
+| 8 | Signed installers, compatibility matrix and soak tests | Strengthen release provenance, third-party plugin confidence and sustained performance reliability |
+
+## Out-of-the-box candidates
+
+| Idea | Why add it | What it enables |
+| --- | --- | --- |
+| Motion Score | A good hand performance can be as valuable as an audio take | Record effect gestures against bars, edit movement envelopes, and replay them with a loop |
+| Character stage directions | Skits need more than a voice dropdown | Assign characters to hand zones, recall dialogue/duet scenes, and render separate character stems |
+| Shadow rehearsal | Unexpected gestures are hard to diagnose during a show | Replay recorded tracking signals with an action timeline and compare intended versus triggered scenes without emitting MIDI or changing audio |
+| Latency-aware scene preparation | AI references and phrase buffers take time to prepare | Prewarm the next character and schedule scene readiness against upcoming bars with a visible timing budget |
+| Performance recipes | Complex setups should be repeatable and easy to share | Package mappings, macro sequences and effect requirements without redistributing licensed plugins or personal references |
+| Gesture grammar | Finger counts alone limit expression | Combine hand shape, movement direction and held gestures into explicit musical phrases, with rehearsal previews |
+| Stage crew assistant | Routine setup interrupts creativity | Offer local, constrained suggestions for routing, clipping and scene preparation, with explicit user control over changes |
+
+These are proposed directions, not implemented features. A production claim requires sustained hardware tests, plugin isolation and a clear supported-host matrix in addition to automated unit checks.
