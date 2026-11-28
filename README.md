@@ -12,6 +12,8 @@
 
 TouchMusic combines microphone effects, pitch correction, webcam hand tracking, reference-based AI voice conversion, a chord pad, a four-track looper, and WAV recording in a standalone Windows desktop app.
 
+See [roadmap.md](roadmap.md) for planned upgrades, standalone feature ideas, and the FL Studio test sequence.
+
 [Quick start](#quick-start) � [Auto-Tune](#pitch-correction) � [Looper](#four-track-looper) � [Gestures](#gesture-control) � [Troubleshooting](#troubleshooting)
 
 ## Features
