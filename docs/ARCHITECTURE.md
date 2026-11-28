@@ -59,7 +59,7 @@ Gesture Learn temporarily disarms performance output. It establishes axis baseli
 
 Motion Score v1 stores at most 4096 finite beat-ordered events. Targets are validated against supported movement/action names. Recording captures filtered movement values and deliberate physical pose actions, so a macro is recorded once rather than duplicated with every expanded action. Playback calls the existing gesture dispatchers and never starts merely because a project was opened. Rehearsal and learning remain separate modes.
 
-MotionTransport splits local rendering at event sample boundaries, tracks beats as tempo changes and limits event work to 128 events per processing call. Local DSP/loop/chord/note commands run there. A bounded 1024-item relay, drained by a 10 ms Qt timer, carries voice/macros/external MIDI and UI feedback. Tokens invalidate stopped scores. Plugin knobs still apply at worker boundaries; this is not sample-accurate DAW automation. Envelope editing and host-seek semantics remain open.
+MotionTransport splits local rendering at event sample boundaries, tracks beats as tempo changes and limits event work to 128 events per processing call. Local DSP/loop-level/chord/note commands run there. A bounded 1024-item relay, drained by a 10 ms Qt timer, carries voice/macros/external MIDI and UI feedback. Tokens invalidate stopped scores. Plugin knobs still apply at worker boundaries; this is not sample-accurate DAW automation. Envelope editing and host-seek semantics remain open.
 
 ## DAW and instrument boundaries
 
@@ -83,6 +83,6 @@ Native state is limited to 8 MiB per blob and 32 MiB per project, transferred in
 
 Native-load tasks return plain results to GUI polling; Qt widgets stay on the GUI thread. Closing increments the lifecycle epoch and terminates only owned candidates. Native editor close controls are read separately from the blocking editor RPC, while all DLL work stays on the worker main thread.
 
-SingleInstance uses a per-data-directory QLockFile. A local Qt server focuses the owner; if named pipes are restricted, a bounded atomic request marker provides focus handoff. Independent data directories remain independent installations. Device monitoring stops an inactive stream and requires explicit refresh/reselection; it does not reopen another microphone automatically.
+SingleInstance uses a per-data-directory QLockFile. An atomic bounded marker requests focus, checked every 200 ms. This survives sender exit before the owner event loop resumes; a short-lived Windows named pipe lost messages in clean-runner testing and was removed. Independent data directories remain independent installations. Device monitoring stops an inactive stream and requires explicit refresh/reselection; it does not reopen another microphone automatically.
 
 Instrument initialization, opaque restore, editor close and stream reset prepare 32 paced silent 512-frame blocks in the owned worker, off the GUI/audio callback. This allows deferred vendor preset loads to settle before accepting notes. The native parameter snapshot is replaced after initialization/restoration so removed or newly exposed parameters are reflected. This finite window is tested for Surge XT 1.3.4, not a guarantee for every synth.

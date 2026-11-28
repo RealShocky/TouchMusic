@@ -3,10 +3,10 @@
 - Portable opaque native presets with bounded chunk transfer, content-addressed blobs, checksum/binary checks and transactional restore. Real Nova 2.2.3 and Surge XT 1.3.4 restoration checked; old v1/parameter-only sessions remain readable.
 - Responsive background effect/instrument loading, shutdown cancellation, native editor event-close and parent-exit worker cleanup. Fixed a large-synth state-restore timeout caused by speculative parameter-name inference.
 - Per-data-directory single-instance ownership and focus handoff prevent competing session writers.
-- Audio sample-clock Motion Score scheduling for local DSP/loop/chord/note actions. UI-only actions use a 10 ms relay; native parameter changes remain worker-quantized. Bounded dense-score cancellation preserves audio processing.
+- Audio sample-clock Motion Score scheduling for local DSP/loop-level/chord/note actions. UI-only actions use a 10 ms relay; native parameter changes remain worker-quantized. Bounded dense-score cancellation preserves audio processing.
 - Inactive device streams stop/disarm safely; selected-device identity is checked before opening. Physical unplug/reconnect has not been tested.
 - Nine rate/block cases plus parameter sweeps for actual effects. Nova/Lyra pass nine; SnapTune fails this host's 96 kHz full-block contract. Reviewed Surge XT download pin and real native-plugin CI probes added.
-- 135 Python tests pass. Accelerated one-hour DSP endurance and ten real worker/state restart cycles pass with zero surviving owned workers. This is not a one-hour hardware soak.
+- 136 Python tests pass. Accelerated one-hour DSP endurance and ten real worker/state restart cycles pass with zero surviving owned workers. This is not a one-hour hardware soak.
 - Paired RTX 5060 conversion benchmarks and actual native bridge GPU return recorded. The latter has 122 converter underruns, no packet gaps/dropped chunks and finite converted stereo output; no physical audio or DAW was used.
 
 Stable public downloads remain v0.4.0. Full AI/FX delay compensation, stereo asset migration, visual Motion Score envelopes, pluginval, clean-machine/signing and combined-load hardware/listening gates remain. FL Studio testing is explicitly delegated to external testers. No production or hardware certification is claimed.

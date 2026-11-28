@@ -321,13 +321,13 @@ With audio stopped, **Open native editor** opens the actual plugin interface in 
 
 Saved skits never automatically load native effects. Review the paths and choose **Restore saved rack**. Plugins must remain installed at their saved paths. This process boundary contains crashes, not malicious binaries running with your OS permissions.
 
-Plugin Center lists fifteen official publisher candidates and stages checksum-pinned TDR Nova 2.2.3, SnapTune 2.4.0 , LyraTune 0.6.7 and Surge XT 1.3.4 archives. Downloaded files are never executed or automatically installed. Other candidates open their official publisher pages until an exact asset is reviewed. No third-party effects or personal references are redistributed. See the [versioned compatibility matrix](docs/PLUGIN_COMPATIBILITY.md), which distinguishes scan evidence from actual editor, listening, hardware and DAW checks.
+Plugin Center lists fifteen official publisher candidates and stages checksum-pinned TDR Nova 2.2.3, SnapTune 2.4.0, LyraTune 0.6.7 and Surge XT 1.3.4 archives. Downloaded files are never executed or automatically installed. Other candidates open their official publisher pages until an exact asset is reviewed. No third-party effects or personal references are redistributed. See the [versioned compatibility matrix](docs/PLUGIN_COMPATIBILITY.md), which distinguishes scan evidence from actual editor, listening, hardware and DAW checks.
 
 ### Motion Score in the development checkout
 
 Open **Motion Score**, start audio and choose **Record**. Perform movement controls and deliberate finger/pinch actions, then **Stop**. Recording replaces the existing score. The event table lets you edit beat positions, targets and normalized values, apply edits, delete rows, and import/export JSON. **Play** explicitly replays automation and disarms camera gestures. Playback can change voices, loops, effects and MIDI. F12 stops playback, releases MIDI notes and mutes output.
 
-Scores are optional saved-performance data and never auto-play on load. Local DSP, loop, chord and instrument-note events follow the audio sample clock. Voice changes, macros and external MIDI use a 10 ms GUI relay; external plugin knobs apply at worker block boundaries. Dense or overflowing scores stop with an explanation. Visual envelopes and DAW automation editing remain on the roadmap.
+Scores are optional saved-performance data and never auto-play on load. Local DSP, loop levels, chord and instrument-note events follow the audio sample clock. Voice changes, loop record/playback commands, macros and external MIDI use a 10 ms GUI relay; loop commands then follow the selected quantization. External plugin knobs apply at worker block boundaries. Dense or overflowing scores stop with an explanation. Visual envelopes and DAW automation editing remain on the roadmap.
 
 ### Loop performance tricks
 
@@ -370,6 +370,6 @@ Actual native hosting returned 90 processed stereo blocks matching standalone DS
 
 Native preset capture/portable restore, responsive effect and instrument loading, per-data-folder single-instance ownership, sample-clock Motion Score playback and safer audio-device loss handling are implemented. Native editor close requests and parent-exit cleanup keep owned plugin workers from outliving the app.
 
-135 automated regressions pass. Real effect scans cover three rates and three block sizes with parameter sweeps. Nova 2.2.3 and LyraTune 0.6.7 pass all nine cases; SnapTune 2.4.0 fails this host's full-block contract at 96 kHz, so use its tested 44.1/48 kHz modes. Surge XT 1.3.4 passes isolated native state restore and stereo chord rendering. CI repeats the three reviewed open-source plugin probes, without distributing their binaries.
+136 automated regressions pass. Real effect scans cover three rates and three block sizes with parameter sweeps. Nova 2.2.3 and LyraTune 0.6.7 pass all nine cases; SnapTune 2.4.0 fails this host's full-block contract at 96 kHz, so use its tested 44.1/48 kHz modes. Surge XT 1.3.4 passes isolated native state restore and stereo chord rendering. CI repeats the three reviewed open-source plugin probes, without distributing their binaries.
 
 An accelerated one-hour software DSP run passed in about two minutes; it is not a hardware soak. Paired actual RTX 5060 inference benchmarks and native GPU audio return are recorded in [Benchmarks](docs/BENCHMARKS.md). The streaming return recorded 122 converter underruns, which remain a measured production limitation. v0.5.0 is still under development. See the roadmap for full delay compensation, stereo asset migration, usability and hardware release gates.
