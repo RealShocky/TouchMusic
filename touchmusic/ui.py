@@ -437,6 +437,15 @@ class MainWindow(QMainWindow):
         self.comparison = VoiceComparison(self)
         self.bridge_dialog = BridgeDialog(self)
         self.plugin_dialog = PluginDialog(self)
+        from .plugin_center import PluginCenter
+        self.plugin_center = PluginCenter(self, DATA)
+        from .motion_dialog import MotionDialog
+        self.motion_dialog = MotionDialog(self)
+        if 'motion_score' in self.settings:
+            try:
+                self.motion_dialog.checked_load(self.settings['motion_score'])
+            except ValueError as exc:
+                self.notice.setText(str(exc))
         if isinstance(self.settings.get('plugins'), dict) and self.settings['plugins'].get('effects'):
             try:
                 self.engine.rack.validate(self.settings['plugins'])
@@ -448,7 +457,8 @@ class MainWindow(QMainWindow):
         self.stage_view = StageView(self)
         performance_page = self.takeCentralWidget()
         self.workspaces = Workspaces(self, performance_page, [
-            ('Voice lab', self.comparison), ('FX rack', self.plugin_dialog), ('Songs', self.setlist_dialog),
+            ('Voice lab', self.comparison), ('FX rack', self.plugin_dialog), ('Plugin Center', self.plugin_center),
+            ('Motion Score', self.motion_dialog), ('Songs', self.setlist_dialog),
             ('Gestures', self.gesture_dialog), ('Macros', self.macro_dialog), ('Music & chords', self.music_dialog),
             ('Audio setup', self.audio_setup), ('MIDI / DAW', self.midi_dialog), ('VST3 bridge', self.bridge_dialog)])
         self.setCentralWidget(self.workspaces)
@@ -480,6 +490,8 @@ class MainWindow(QMainWindow):
         tools = self.menuBar().addMenu('Tools')
         tools.addAction('Voice comparison lab', self.open_comparison)
         tools.addAction('VST3 effect rack', self.open_plugins)
+        tools.addAction('Plugin Center', lambda: self.workspaces.open('Plugin Center'))
+        tools.addAction('Motion Score', lambda: self.workspaces.open('Motion Score'))
         tools.addAction('Gesture macros', self.open_macros)
         tricks = tools.addMenu('Loop playback')
         for label, command in [('Reverse', 'reverse'), ('Half speed (pitch changes)', 'half'),
@@ -841,6 +853,8 @@ class MainWindow(QMainWindow):
                     slider.setValue(BUILTIN_PRESETS[name].get(key, EFFECT_DEFAULTS.get(key, 0)))
 
     def apply_performance(self, saved):
+        if 'motion_score' in saved and not self.motion_dialog.replaying:
+            self.motion_dialog.checked_load(saved['motion_score'])
         if isinstance(saved.get('plugins'), dict):
             if self.engine.rack.apply_values(saved['plugins']):
                 self.plugin_dialog.pending = None
@@ -925,6 +939,7 @@ class MainWindow(QMainWindow):
             'midi': self.midi_dialog.settings(),
             'gesture_precision': self.precision_dialog.settings(),
             'macros': self.macro_bank.settings(),
+            'motion_score': self.motion_dialog.score.settings(),
             'plugins': self.plugin_dialog.pending if self.plugin_dialog.pending is not None else self.engine.rack.settings(),
         }
 
@@ -1052,6 +1067,7 @@ class MainWindow(QMainWindow):
 
     def save_settings(self):
         self.settings = {**self.performance_settings(), 'presets': self.saved_presets,
+                         'plugin_folders': self.settings.get('plugin_folders', []),
                          'input': self.inputs.currentText(), 'output': self.outputs.currentText(),
                          'setlist_file': str(self.setlist_dialog.path or ''),
                          'routing_profiles': self.routing_profiles}
@@ -1247,6 +1263,8 @@ class MainWindow(QMainWindow):
         self.camera_label.setPixmap(QPixmap.fromImage(image).scaled(self.camera_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     def gestures(self, controls):
+        if self.plugin_dialog.capture_learn(controls):
+            return
         if self.calibrating_until:
             for control in controls:
                 hand = control['hand']
@@ -1340,6 +1358,7 @@ class MainWindow(QMainWindow):
             self.gesture_preview.setText(f'{axis} would set {target} to {self.movement_text(target, filtered)}')
             return
         self.gesture_level(target, filtered)
+        self.motion_dialog.capture('level', target, filtered)
         self.gesture_preview.setText(f'{axis}: {target} {self.movement_text(target, filtered)}')
 
     def movement_text(self, target, value):
@@ -1359,6 +1378,7 @@ class MainWindow(QMainWindow):
         return f'{value:.0%}'
 
     def emergency_mute(self):
+        self.motion_dialog.stop()
         self.mute_button.setChecked(True)
         self.toggle_mute(True)
         self.arm.setChecked(False)
@@ -1541,6 +1561,8 @@ class MainWindow(QMainWindow):
             return
         if action != 'None':
             self.gesture_preview.setText(f'{pose}: {action}')
+            if pose.startswith(('Left ', 'Right ')):
+                self.motion_dialog.capture('action', action)
         if action in MACRO_ACTIONS:
             if not self.macro_bank.definitions.get(action):
                 self.notice.setText('Configure this slot in Session > Gesture macros first.')
@@ -1689,6 +1711,8 @@ class MainWindow(QMainWindow):
             self.notice.setText(f'Recording saved. Dropped audio blocks: {recorder.dropped}.')
 
     def tick(self):
+        self.plugin_dialog.poll()
+        self.motion_dialog.tick()
         self.bridge_dialog.poll()
         if self.plugin_dialog.isVisible():
             self.plugin_dialog.select_parameter(self.plugin_dialog.parameter.currentText())
@@ -1799,6 +1823,7 @@ class MainWindow(QMainWindow):
             super().keyPressEvent(event)
 
     def closeEvent(self, event):
+        self.plugin_center.shutdown()
         self.stage_view.hide()
         self.bridge_dialog.server.close()
         self.comparison.cancel()
@@ -1807,6 +1832,7 @@ class MainWindow(QMainWindow):
         self.timer.stop()
         self.midi.close()
         self.engine.stop()
+        self.engine.rack.close()
         if self.camera:
             self.closing = True
             self.camera.stop()

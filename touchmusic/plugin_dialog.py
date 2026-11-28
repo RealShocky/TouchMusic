@@ -1,5 +1,8 @@
 """VST3 effects, generic controls, and eight gesture parameter bindings."""
 from pathlib import Path
+import threading
+import time
+from .gesture_learn import GestureLearner
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget,
@@ -13,9 +16,14 @@ class PluginDialog(QDialog):
         self.setWindowTitle('VST3 effect rack')
         self.resize(760, 580)
         self.pending = None
+        self.learner = None
+        self.learn_binding = None
+        self.editor_task = None
+        self.editor_error = ''
         layout = QVBoxLayout(self)
         hint = QLabel('Four audio effects, processed in list order after built-in vocal effects. Stereo effect output '
-                      'is folded to the mono vocal bus. Stop audio before loading, removing, or reordering plugins. '
+                      'is preserved at the output. Isolated hosting adds 2048 frames (42.7 ms at 48 kHz). '
+                      'Stop audio before loading, removing, or reordering plugins. '
                       'Install plugins yourself; saved skits never load native plugins automatically.')
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -27,6 +35,8 @@ class PluginDialog(QDialog):
             menu.addAction(name, lambda checked=False, link=url: QDesktopServices.openUrl(QUrl(link)))
         downloads.setMenu(menu)
         layout.addWidget(downloads)
+        self.button('Plugin Center: discover, scan and download',
+                    lambda: self.owner.workspaces.open('Plugin Center'), layout)
         self.effects = QListWidget()
         self.effects.currentRowChanged.connect(self.select_effect)
         layout.addWidget(self.effects, 1)
@@ -49,6 +59,12 @@ class PluginDialog(QDialog):
         row.addWidget(self.gesture_knob)
         self.button('Bind to selected parameter', self.bind, row)
         self.button('Restore saved rack', self.restore, row)
+        layout.addLayout(row)
+        row = QHBoxLayout()
+        self.button('Gesture Learn', self.learn, row)
+        self.button('Cancel Learn', self.cancel_learn, row)
+        self.button('Open native editor', self.open_editor, row)
+        self.button('Restart isolated rack', self.restart, row)
         layout.addLayout(row)
         self.status = QLabel('Load an installed VST3 audio effect. Generic parameter controls are shown here.')
         self.status.setWordWrap(True)
@@ -76,6 +92,9 @@ class PluginDialog(QDialog):
             self.status.setText('Saved rack pending. Review these plugin files, then Restore saved rack: '+paths)
 
     def stopped(self):
+        if self.rack.editor_open or (self.editor_task and self.editor_task.is_alive()):
+            self.status.setText('Close the native editor before changing the rack.')
+            return False
         if self.owner.engine.stream:
             self.status.setText('Stop audio before changing the rack structure.')
             return False
@@ -164,3 +183,73 @@ class PluginDialog(QDialog):
                 self.status.setText('Saved rack restored.')
             except Exception as exc:
                 self.status.setText('Rack restore failed; existing rack retained: '+str(exc))
+
+    def restart(self):
+        if self.stopped():
+            try:
+                self.rack.restart()
+                self.status.setText('Isolated rack restarted. Pipeline delay: 42.7 ms, plus plugin and device latency.')
+            except Exception as exc:
+                self.status.setText(str(exc))
+
+    def open_editor(self):
+        index = self.effects.currentRow()
+        if index < 0 or not self.stopped():
+            return
+        self.owner.arm.setChecked(False)
+        self.owner.motion_dialog.stop()
+        self.editor_error = ''
+        self.rack.editor_pending = True
+        def execute():
+            try:
+                self.rack.show_editor(index)
+            except Exception as exc:
+                self.editor_error = str(exc)
+            finally:
+                self.rack.editor_pending = False
+        self.editor_task = threading.Thread(target=execute, daemon=True)
+        self.editor_task.start()
+        self.status.setText('Native editor opened in the plugin worker. Close it before starting audio. '
+                            'Exposed parameter changes are retained; opaque plugin state is not yet saved.')
+
+    def learn(self):
+        index, name = self.effects.currentRow(), self.parameter.currentText()
+        if index < 0 or not name or not self.owner.camera:
+            self.status.setText('Start the camera and select a loaded plugin parameter first.')
+            return
+        self.owner.arm.setChecked(False)
+        self.owner.motion_dialog.stop()
+        self.learn_binding = (index, name, str(self.gesture_knob.currentIndex()+1))
+        self.learner = GestureLearner()
+        self.status.setText('Learning for 10 seconds. Move one hand up/down, left/right, or change thumb-index spread. '
+                            'Gestures stay disarmed after learning.')
+
+    def capture_learn(self, controls):
+        if self.learner is None:
+            return False
+        axis = self.learner.feed(controls)
+        if axis == 'timeout':
+            self.cancel_learn()
+        elif axis:
+            index, name, knob = self.learn_binding
+            if index < len(self.rack.slots) and name in self.rack.slots[index]['parameters']:
+                self.rack.bindings[knob] = {'slot': index, 'parameter': name}
+                self.owner.mappings[axis].setCurrentText('Plugin knob '+knob)
+                self.owner.precision.reset()
+                self.status.setText(f'Learned {axis} -> Plugin knob {knob} -> {name}. Arm gestures to perform.')
+            self.learner = None
+        return True
+
+    def cancel_learn(self):
+        self.learner = None
+        self.status.setText('Gesture Learn ended. Gestures remain disarmed.')
+
+    def poll(self):
+        if self.learner and time.monotonic() >= self.learner.deadline:
+            self.cancel_learn()
+        if self.editor_task and not self.editor_task.is_alive():
+            self.editor_task = None
+            self.refresh()
+            self.status.setText(self.editor_error or 'Editor closed. Exposed parameters updated.')
+        if self.rack.error:
+            self.status.setText('Plugin worker stopped; delayed dry fallback active. Stop audio and restart rack. '+self.rack.error)

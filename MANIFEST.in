@@ -8,5 +8,9 @@ prune docs
 include roadmap.md release-notes.md
 recursive-include native/control_bridge *.cpp *.h *.md *.txt
 include tools/verify_native_bridge.py tools/build_release.py
+include tools/benchmark_audio.py
+include tools/release_version.py
+include docs/ARCHITECTURE.md docs/TECHNICAL_DEBT.md docs/PLUGIN_COMPATIBILITY.md docs/BENCHMARKS.md
+recursive-include docs/verification *.json
 prune dist
 prune build

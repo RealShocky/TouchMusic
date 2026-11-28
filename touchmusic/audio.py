@@ -10,7 +10,7 @@ from .music import ChordPad, SCALES, chord_notes, nearest_note
 from .transport import BeatClock
 from .vocal import FormantShifter, VocalAnalysis, harmony_shift
 from .alignment import align_recording, mix_stems
-from .plugin_rack import PluginRack
+from .isolated_rack import IsolatedPluginRack
 
 RATE = 48000
 BLOCK = 512
@@ -211,7 +211,8 @@ class PitchVoice:
 
 
 class Recorder:
-    def __init__(self, path, stems=False, align=False):
+    def __init__(self, path, stems=False, align=False, channels=1):
+        self.channels = channels
         self.queue = queue.Queue(maxsize=512)
         self.dropped = 0
         self.error = ''
@@ -230,7 +231,7 @@ class Recorder:
             paths.extend(self.stem_dir / (name + '.wav') for name in STEM_NAMES)
         try:
             for target in paths:
-                self.files.append(sf.SoundFile(str(target), 'w', RATE, 1, subtype='PCM_24'))
+                self.files.append(sf.SoundFile(str(target), 'w', RATE, channels, subtype='PCM_24'))
         except Exception:
             for file in self.files:
                 file.close()
@@ -346,7 +347,8 @@ class AudioEngine:
         self.host_locked = False
         self.track, self.preview = SamplePlayer(), SamplePlayer()
         self.test_tone = SamplePlayer()
-        self.rack = PluginRack()
+        self.rack = IsolatedPluginRack()
+        self.rack_origins = np.full(self.rack.latency_frames, -1, np.int64)
         self.loops = [LoopTrack(RATE) for _ in range(LOOP_COUNT)]
         self.loop = self.loops[0]
         self.commands = queue.SimpleQueue()
@@ -500,7 +502,7 @@ class AudioEngine:
         wet = min(1., abs(self.tune_shift) * 30.)
         return audio * (1. - wet) + corrected * wet
 
-    def process(self, audio):
+    def process(self, audio, stereo=False):
         mode = self.params['quantize']
         clock = self.clock
         clock.set_tempo(self.params['bpm'], mode)
@@ -521,7 +523,8 @@ class AudioEngine:
             self._apply_command(*command)
         blocks.append(self._render(audio[offset:]))
         clock.frame = end
-        return blocks[0] if len(blocks) == 1 else np.concatenate(blocks)
+        result = blocks[0] if len(blocks) == 1 else np.concatenate(blocks)
+        return result if stereo else result.mean(axis=1)
 
     def _render(self, audio):
         p = self.params.copy()
@@ -565,8 +568,19 @@ class AudioEngine:
             self.harmony_analysis.process(audio, p['vocal_range'])
             harmony_note = self.harmony_analysis.center
         interval = harmony_shift(harmony_note, chord, p['harmony_mode'])
-        vocal = (audio if p['dialogue'] else self.rack.process(self.vocal_effects(audio, p, interval), RATE)) * p['gain']
-        capture = loop_mic * p['gain'] if p['loop_input'] == 'Mic before AI' else vocal
+        vocal = (np.stack((audio, audio)) if p['dialogue'] else
+                 self.rack.process(self.vocal_effects(audio, p, interval), RATE, stereo=True)).T * p['gain']
+        if self.rack.slots and p['dialogue']:
+            # Advance hidden FX with silence so old phrases cannot return after a dialogue pause.
+            self.rack.process(np.zeros_like(audio), RATE, stereo=True)
+            frames = np.concatenate((self.rack_origins, np.full(len(audio), -1, np.int64)))
+            self.rack_origins = frames[len(audio):]
+        if self.rack.slots and not p['dialogue']:
+            source_frames = origins if origins is not None else np.arange(
+                self.clock.frame, self.clock.frame+len(audio), dtype=np.int64)
+            frames = np.concatenate((self.rack_origins, source_frames))
+            origins, self.rack_origins = frames[:len(audio)], frames[len(audio):]
+        capture = loop_mic * p['gain'] if p['loop_input'] == 'Mic before AI' else vocal.mean(axis=1)
         accompaniment = np.zeros_like(audio)
         loop_stems = []
         for track in self.loops:
@@ -578,16 +592,21 @@ class AudioEngine:
         chords = self.pad.process(len(audio), chord, p['chord_level'] if p['chord_enabled'] else 0)
         accompaniment += backing + chords
         if recorder:
-            mix = np.tanh((vocal + accompaniment) * p['master'])
+            mix = np.tanh((vocal + accompaniment[:, None]) * p['master'])
             stems = (dry, vocal, *loop_stems, backing, chords) if recorder.stem_dir else ()
+            if recorder.channels == 1:
+                mix = mix.mean(axis=1)
+                stems = tuple(s.mean(axis=1) if s.ndim == 2 else s for s in stems)
+            else:
+                stems = tuple(np.stack((s, s), axis=1) if s.ndim == 1 else s for s in stems)
             recorder.write(mix, stems, self.clock.frame, origins)
-        heard = dry * p['gain'] if p['monitor'] == 'Dry mic' else vocal
+        heard = np.broadcast_to(dry[:, None] * p['gain'], vocal.shape) if p['monitor'] == 'Dry mic' else vocal
         preview = self.preview.read(len(audio)) * .65
         preview += self.test_tone.read(len(audio))
         counting = any(key[0] in ('loop', 'overdub') and key in self.clock.beat_targets
                        for key in self.clock.pending)
         click = self.clock.click(len(audio)) if p['metronome'] or counting else 0
-        output = np.tanh((heard + accompaniment + preview + click) * p['master']).astype(np.float32)
+        output = np.tanh((heard + (accompaniment + preview + click)[:, None]) * p['master']).astype(np.float32)
         if self.muted:
             output.fill(0)
         self.peak = float(np.max(np.abs(output)))
@@ -622,8 +641,8 @@ class AudioEngine:
         try:
             if status:
                 self.overruns += 1
-            result = self.process(inputs[:, 0].copy())
-            outputs[:] = result[:, None]
+            result = self.process(inputs[:, 0].copy(), stereo=True)
+            outputs[:] = result
         except Exception as exc:
             outputs.fill(0)
             self.error = str(exc)
@@ -632,6 +651,8 @@ class AudioEngine:
             self.max_callback_ms = max(self.max_callback_ms, self.callback_ms)
 
     def start(self, input_device, output_device):
+        if self.rack.editor_open or self.rack.editor_pending:
+            raise ValueError('Close the native plugin editor before starting audio.')
         input_info = sd.query_devices(input_device, 'input')
         output_info = sd.query_devices(output_device, 'output')
         if input_info['hostapi'] != output_info['hostapi']:
@@ -641,6 +662,9 @@ class AudioEngine:
         if api == 'Windows WASAPI':
             settings = (sd.WasapiSettings(auto_convert=True), sd.WasapiSettings(auto_convert=True))
         self.stop()
+        if self.rack.slots:
+            self.rack.reset_stream()
+        self.rack_origins.fill(-1)
         self.clock = BeatClock(RATE)
         self.clock.set_tempo(self.params['bpm'], self.params['quantize'])
         self.error = ''
@@ -687,7 +711,7 @@ class AudioEngine:
         if not self.stream:
             raise ValueError('Start audio before recording.')
         self.stop_recording()
-        self.recorder = Recorder(path, stems=stems, align=align)
+        self.recorder = Recorder(path, stems=stems, align=align, channels=2)
 
     def stop_recording(self):
         recorder, self.recorder = self.recorder, None

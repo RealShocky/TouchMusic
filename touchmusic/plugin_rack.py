@@ -7,7 +7,7 @@ import numpy as np
 
 
 class PluginRack:
-    def __init__(self, loader=None):
+    def __init__(self, loader=None, preserve_stereo=False):
         from pedalboard import load_plugin
         self.loader = loader or load_plugin
         self.slots = []
@@ -15,6 +15,7 @@ class PluginRack:
         self.lock = threading.Lock()
         self.error = ''
         self.bypassed_blocks = 0
+        self.preserve_stereo = preserve_stereo
 
     def add(self, path, plugin_name=None, parameters=None, bypass=False):
         path = Path(path).resolve()
@@ -54,12 +55,17 @@ class PluginRack:
                 try:
                     plugin = slot['plugin']
                     channels = getattr(plugin, 'num_input_channels', 2)
-                    source = audio if channels == 1 else np.stack((audio, audio))
+                    mono = audio.mean(axis=0) if audio.ndim == 2 else audio
+                    source = mono if channels == 1 else (audio if audio.ndim == 2 else np.stack((audio, audio)))
                     processed = np.asarray(plugin.process(source, rate, reset=False), np.float32)
-                    if processed.ndim == 2:
+                    if processed.ndim == 2 and not self.preserve_stereo:
                         processed = processed.mean(axis=0)
-                    if processed.shape != audio.shape or not np.isfinite(processed).all():
+                    if (processed.ndim not in (1, 2) or processed.shape[-1] != audio.shape[-1]
+                            or (processed.ndim == 2 and processed.shape[0] not in (1, 2))
+                            or not np.isfinite(processed).all()):
                         raise ValueError('Plugin returned an invalid audio block.')
+                    if self.preserve_stereo:
+                        processed = np.broadcast_to(processed, (2, processed.shape[-1])).copy()
                     audio = processed
                 except Exception as exc:
                     slot['bypass'] = True
@@ -124,7 +130,7 @@ class PluginRack:
         effects = settings.get('effects', [])
         if not isinstance(effects, list) or len(effects) > 4:
             raise ValueError('A rack supports up to four effects.')
-        prepared = PluginRack(self.loader)
+        prepared = PluginRack(self.loader, self.preserve_stereo)
         for item in effects:
             prepared.add(item['path'], item.get('plugin_name'), item.get('parameters'), item.get('bypass', False))
         for key, binding in settings.get('bindings', {}).items():

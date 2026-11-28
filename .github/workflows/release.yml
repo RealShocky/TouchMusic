@@ -27,10 +27,15 @@ jobs:
   build:
     needs: [test, native]
     runs-on: ubuntu-latest
+    outputs:
+      publishable: ${{ steps.version.outputs.publishable }}
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Identify stable release eligibility
+        id: version
+        run: python tools/release_version.py
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -52,6 +57,7 @@ jobs:
       - name: Build Windows setup ZIP and checksums
         run: python tools/build_release.py
       - name: Reuse exact published distributions on rerun
+        if: steps.version.outputs.publishable == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -68,6 +74,7 @@ jobs:
             dist/*.whl
             dist/*.tar.gz
       - name: Publish GitHub release
+        if: steps.version.outputs.publishable == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -81,7 +88,7 @@ jobs:
           fi
   publish-pypi:
     needs: build
-    if: github.event_name == 'push' || vars.PYPI_PUBLISH == 'true' || inputs.publish_pypi == true
+    if: needs.build.outputs.publishable == 'true' && (github.event_name == 'push' || vars.PYPI_PUBLISH == 'true' || inputs.publish_pypi == true)
     runs-on: ubuntu-latest
     environment:
       name: pypi

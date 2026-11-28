@@ -1,5 +1,8 @@
 # TouchMusic
 
+> Development checkout: **0.5.0.dev1**, not a finished v0.5.0 release. Published stable downloads remain v0.4.0. The [authoritative roadmap](roadmap.md) tracks every requested feature, dependency and verification gate.
+
+
 ![Windows](https://img.shields.io/badge/platform-Windows_10%2F11-0078D4)
 ![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![Standalone](https://img.shields.io/badge/app-standalone-559C80)
@@ -203,7 +206,7 @@ In Gesture mapping, map continuous hand movements to **MIDI CC 0–119** and pos
 
 Arm gestures to send. Rehearsal previews actions. Disarming sends all-notes-off. MIDI output disconnects when the app closes. Timed note release prevents a pose from leaving its notes held indefinitely. The all-notes-off button is also available manually. Connections are selected explicitly after launching the app.
 
-To link a plugin knob in FL Studio, right-click it, choose Link to controller, and move the mapped hand. MIDI transports control messages. Use the audio route above for vocals. Native TouchMusic VST3 hosting would require a separate plugin implementation.
+To link a plugin knob in FL Studio, right-click it, choose Link to controller, and move the mapped hand. MIDI transports control messages. Use the audio route above for vocals. The existing native control bridge sends controls/timing; the full processed-audio bridge is still planned.
 
 Official references are [FL Studio audio settings](https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/envsettings_audio.htm), [audio recording](https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/recording_audio.htm), and [external controller linking](https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/automation_linking.htm).
 
@@ -290,7 +293,7 @@ Gesture precision and stage controls are covered by automated tests. Camera comf
 
 ## Studio workspaces (0.4.0)
 
-TouchMusic now has a menu bar and ten sidebar workspaces: Perform, Voice lab, FX rack, Songs, Gestures, Macros, Music & chords, Audio setup, MIDI / DAW, and VST3 bridge. The stage window remains available separately. Existing Session menu actions still work.
+The v0.4.0 baseline has a menu bar and ten sidebar workspaces: Perform, Voice lab, FX rack, Songs, Gestures, Macros, Music & chords, Audio setup, MIDI / DAW, and VST3 bridge. The stage window remains available separately. Existing Session menu actions still work.
 
 ### Guided audio setup and diagnostics
 
@@ -304,13 +307,27 @@ Use **Macros** to save up to eight actions in each of eight slots, then map a po
 
 Stop main audio, load the singing engine and a reference, then open **Voice lab**. Choose source audio, a start time and 1..8 second length, then choose A/B voice references and Live/Studio quality. Render comparison uses the existing model worker serially, with bounded context chunks rather than loading another GPU model. Preview dry/A/B on the explicitly selected preview output, or export floating-point WAVs. Main audio cannot start during rendering. Cancellation waits for the current model chunk. The same source phrase makes comparison easier; displayed render time, RMS and overload fractions do not constitute an objective voice-similarity score. Model quality still needs listening tests.
 
-### VST3 effects
+### VST3 effects in the development checkout
 
-Open **FX rack**, stop audio, and load a trusted installed 64-bit VST3 audio effect file or bundle. Up to four effects process in order after built-in vocal effects and before vocal gain/loop capture. Dialogue mode bypasses the rack. Stereo effect output is folded to the current mono vocal bus. Instruments, sidechains, native plugin editors, and separate stereo outputs are not supported in this first rack.
+Open **Plugin Center** to discover installed VST3 paths without loading them. Add a custom folder if needed, enter the exact publisher version and choose **Scan selected**. A successful scan permits **Load into FX rack**. Failed scans are quarantined in Plugin Center until a successful rescan. **FX rack** also retains the explicit file/bundle picker and four-slot controls.
 
-Select a normalized parameter and bind it to Plugin knob 1..8, then map hand movement to that knob. Bypass/reorder/remove controls and normalized parameter snapshots are provided. A skit's native rack requires explicit review and Restore saved rack; it never loads third-party native code automatically. Plugins must remain installed at their saved paths. Snapshots preserve exposed parameters, not opaque plugin presets. Native plugins run inside the process; crash isolation remains roadmap work. Python exceptions or invalid returned audio bypass the failing slot and appear in diagnostics.
+Third-party effects load/process in an owned worker process. A native crash or timeout stops that worker while TouchMusic continues with time-aligned delayed dry audio. Stop audio, then use **Restart isolated rack** to retry. Populated racks add 2048 scheduled frames, approximately 42.7 ms at 48 kHz, before unknown plugin, AI and device delays. This trades latency for fault containment; it is not a hardware round-trip measurement or full plugin latency compensation.
 
-Publisher download links are available inside the rack. Useful free candidates include [TDR Nova](https://www.tokyodawn.net/tdr-nova/free/) for dynamic EQ, [Valhalla Supermassive](https://valhalladsp.com/shop/reverb/valhalla-supermassive/) for delay/reverb, and [MFreeFXBundle](https://www.meldaproduction.com/MFreeFXBundle). Install the VST3 version from its publisher. Plugins are not redistributed in TouchMusic downloads. TDR Nova 2.2.3 was checked with 100 live-sized blocks and a gesture parameter update; this does not certify all presets or other plugins.
+Stereo effect output is preserved through the master, device output and new stereo performance/stem WAVs. Existing loop capture and backing/reference storage remain mono for archive compatibility. Dialogue mode bypasses vocal effects and the external rack. Instruments and sidechains require separate planned hosting work.
+
+Select a parameter and bind **Plugin knob 1..8**, then choose that knob in Gesture mapping. Or start the camera, choose **Gesture Learn**, and deliberately move a hand vertically/horizontally or change thumb-index spread. Learning disarms performance gestures and times out after ten seconds. Arm again when ready to perform.
+
+With audio stopped, **Open native editor** opens the actual plugin interface in its worker process. Close it before starting audio or changing the rack. Exposed parameter changes synchronize on close. The current runtime native state survives normal audio start/stop, but opaque programs/state are not yet saved across rack reloads or projects. Snapshots preserve normalized exposed parameters.
+
+Saved skits never automatically load native effects. Review the paths and choose **Restore saved rack**. Plugins must remain installed at their saved paths. This process boundary contains crashes, not malicious binaries running with your OS permissions.
+
+Plugin Center lists fifteen official publisher candidates and stages a checksum-pinned TDR Nova 2.2.3 archive. Downloaded files are never executed or automatically installed. Other candidates open their official publisher pages until an exact asset is reviewed. No third-party effects or personal references are redistributed. See the [versioned compatibility matrix](docs/PLUGIN_COMPATIBILITY.md), which distinguishes scan evidence from actual editor, listening, hardware and DAW checks.
+
+### Motion Score in the development checkout
+
+Open **Motion Score**, start audio and choose **Record**. Perform movement controls and deliberate finger/pinch actions, then **Stop**. Recording replaces the existing score. The event table lets you edit beat positions, targets and normalized values, apply edits, delete rows, and import/export JSON. **Play** explicitly replays automation and disarms camera gestures. Playback can change voices, loops, effects and MIDI. F12 stops playback, releases MIDI notes and mutes output.
+
+Scores are optional saved-performance data and never auto-play on load. The current beat timeline is serviced by the 100 ms UI timer, so it is not sample-accurate automation. Visual envelopes and deterministic scheduling remain on the roadmap.
 
 ### Loop performance tricks
 
@@ -327,3 +344,13 @@ Download the separate Windows Control Bridge ZIP from the release and load the `
 ### Platform support
 
 The supported release is **Windows 10/11 x64 with Python 3.11**. Python modules and native bridge source contain portable components, but macOS/Linux camera, device routing, engine installation, packaging and host validation are not certified. This is a Windows studio build, not a completed cross-platform release.
+
+## Engineering and verification
+
+- [roadmap.md](roadmap.md): authoritative requirements, priorities, status and release gates.
+- [Architecture](docs/ARCHITECTURE.md): process boundaries, stereo/audio timing and compatibility contract.
+- [Technical debt](docs/TECHNICAL_DEBT.md): known risks and remediation.
+- [Plugin compatibility](docs/PLUGIN_COMPATIBILITY.md): exact binary/version evidence.
+- [Benchmarks](docs/BENCHMARKS.md): repeatable CPU/memory/timing comparison and explicitly unmeasured hardware/GPU checks.
+
+Run `python -m pytest tests -q` for automated regressions. The synthetic benchmark is `python tools/benchmark_audio.py --label development --output benchmark.json`; it does not open audio hardware or invoke AI. Development versions are built/tested but are excluded from automatic stable GitHub/PyPI publishing.

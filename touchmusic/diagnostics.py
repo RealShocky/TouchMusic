@@ -16,6 +16,9 @@ def diagnostics_report(engine, camera_active=False):
         'reported_device_latency_seconds': latency,
         'audio_error': engine.error, 'plugin_error': engine.rack.error,
         'plugin_bypassed_blocks': engine.rack.bypassed_blocks,
+        'plugin_pipeline_latency_frames': engine.rack.latency_frames if engine.rack.slots else 0,
+        'plugin_worker_compute_ms': engine.rack.compute_ms,
+        'plugin_worker_pid': engine.rack.client.process.pid if engine.rack.client else None,
         'ai': None if converter is None else {
             'status': converter.status, 'ready': converter.ready,
             'quality': converter.quality, 'inference_ms': round(converter.inference_ms, 1),

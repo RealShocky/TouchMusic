@@ -78,6 +78,9 @@ def load_project(path):
 def validate_settings(settings, include_scenes=True):
     if not isinstance(settings, dict):
         raise ValueError('Invalid project settings.')
+    if 'motion_score' in settings:
+        from .motion_score import MotionScore
+        MotionScore.validate(settings['motion_score'])
     for key, kind in {'effects': dict, 'mapping': dict, 'voice_slots': dict, 'music': dict,
                       'loop_levels': list, 'muted_loops': list, 'loop_selected': int, 'track_name': str}.items():
         if key in settings and not isinstance(settings[key], kind):

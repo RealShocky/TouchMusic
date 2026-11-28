@@ -1,124 +1,147 @@
-# TouchMusic roadmap
+# TouchMusic authoritative roadmap
 
-TouchMusic is a standalone vocal performance instrument with gesture control and an emerging FL Studio connection. This roadmap tracks the next work and the live checks needed to validate it.
+Updated 2026-11-28. This is the single requirements and delivery tracker. It supersedes the earlier overlapping roadmap sections and external AI recommendations. Supporting documents contain evidence and design, not independent feature promises.
 
-## Current baseline
+## Status and evidence rules
 
-Version 0.4.0 adds studio workspaces, guided audio setup, diagnostics, gesture macros, voice comparisons, VST3 effect hosting, a native control bridge, recovery history, and loop playback tricks. Version 0.3.0 added gesture precision, expanded mappings, stage view, and output diagnostics. Version 0.2.0 introduced overdubbing, timed capture, reference suggestions, recovery, and setlists.
+- **Planned**: accepted, with no completed implementation yet.
+- **In Progress**: development started; the complete acceptance gate has not passed.
+- **Implemented**: code exists; verification is incomplete.
+- **Verified**: the explicitly named automated or manual check passed. This never implies unperformed hardware or DAW validation.
+- **Blocked**: an identified dependency prevents the next required check. Record the dependency and unblock condition.
 
-- Standalone desktop effects, pitch correction, voice references, and local AI conversion.
-- Reference-import player with waveform, zoom, and draggable 1–8 second selection.
-- Four loop tracks with beat/bar scheduling, tap tempo, metronome, and overdub, undo/redo, count-in, fixed-bar capture, edge fades, and progress.
-- Diatonic chord pad, chord-following harmonies, formant controls, and voice slots.
-- Gesture-to-MIDI CC, notes, and chords with timed note release and all-notes-off.
-- Portable skits, WAV stems, and optional aligned vocal and mix export.
+Priority P0 is stability and compatibility, P1 is production functionality, P2 is expansion. Windows x64 is the supported platform. Python portability does not establish macOS/Linux support.
 
-Automated tests and package installation were verified during development. End-to-end FL Studio and physical MIDI/audio routing tests are pending.
+Current automated checkpoint: **112 Python tests**, **47 native SDK checks**, actual native host/control transport, package metadata and installed GUI/worker startup passed. [Evidence](docs/verification/development-checks.json). These are software checks, not microphone/camera/DAW validation.
 
-## Planned integration and UI upgrades
+The published baseline is **v0.4.0**. **v0.5.0 is in development, not released or production certified.** The ten requested v0.5.0 capabilities below are the release scope. A partial implementation does not satisfy that release gate.
 
-| Priority | Work | Intended result | Completion check |
+## v0.5.0 delivery scope
+
+| ID | Priority | Requirement | Status | Dependencies and acceptance gate |
+| --- | --- | --- | --- | --- |
+| V50-01 | P0 | Isolated VST3 effect hosting | In Progress | Owned child process, bounded IPC/queues, watchdog, delayed dry fallback, explicit restart and transactional load implemented. Automated termination/timeout tests pass. Finish lifecycle/long-session stress checks and recovery UX. A process boundary is not a malware sandbox. |
+| V50-02 | P0 | Plugin Center discovery and management | In Progress | Metadata-only discovery of standard/user folders, manual scan/load, binary-identity cache and failed-scan quarantine implemented. Complete asynchronous rack load and scan invalidation/lifecycle tests. |
+| V50-03 | P1 | Curated catalog and official downloads | In Progress | Fifteen publisher entries, license labels, official links and checksum-pinned TDR Nova 2.2.3 archive staging implemented. Review/version-pin further downloads individually. Never equate freeware with redistribution rights. |
+| V50-04 | P0 | Compatibility scanner | In Progress | Separate-process load, 100-block stereo/finite-output probe, default impulse onset, parameter readback, binary SHA-256 and JSON reports implemented. Add multiple rates/block sizes, pluginval integration and sustained automation stress. Impulse onset is not declared plugin latency or hardware round trip. |
+| V50-05 | P1 | Native plugin editor interfaces | Implemented | Actual Pedalboard show_editor runs on the plugin worker main thread. Audio must be stopped, UI remains responsive, exposed parameters synchronize on close. Broker routing tested; actual vendor editor opening/closing remains unverified. Opaque state persistence is a separate dependency. |
+| V50-06 | P0 | Stereo audio engine | In Progress | External stereo FX survive through hardware callback and new stereo performance/stem WAVs; mono processing API and legacy loops remain compatible. Stereo regression test passes. Stereo backing/reference/loop assets and full project migration remain planned. |
+| V50-07 | P1 | Gesture Learn | Implemented | Select effect parameter/knob and move a hand axis. Deliberate dominant motion binds height, horizontal position or spread, with timeout/cancel and disarmed performance. Pure and UI regression tests pass; physical webcam validation remains pending. |
+| V50-08 | P1 | Full DAW AI audio bridge | Planned | Depends on V50-01/06 and stable timing. Preserve existing control bridge. Add bounded bidirectional audio transport, stream identity, sample provenance, declared delay, rate/block negotiation, drift handling and failover. Verify real processed AI return inside a DAW before claiming completion. |
+| V50-09 | P1 | Isolated VST3 instruments | Planned | Depends on V50-01/06. Separate synth bus, timestamped MIDI, voice/note lifecycle, panic, chords and gesture notes. Effect rack continues rejecting instruments until this path exists. Test Surge XT/Cardinal exact builds, note-off and restart behavior. |
+| V50-10 | P1 | Motion Score | In Progress | Beat-based movement/action recording, event editing/deletion, JSON import/export, explicit replay and optional saved-performance data implemented. Automated event/tempo/persistence tests pass. Current playback uses the 100 ms UI timer; sample-accurate scheduling, visual envelope editing and DAW automation capture remain planned. |
+
+### Dependency order
+
+1. Preserve v0.4.0 behavior and saved content; establish repeatable tests and benchmarks.
+2. Complete isolated effect lifecycle, stereo rendering, scanner and diagnostic evidence.
+3. Complete Plugin Center workflows, native editor state and Gesture Learn usability.
+4. Add the isolated instrument bus and robust MIDI/note scheduling.
+5. Add the bidirectional DAW audio bridge using the stabilized stereo/sample provenance model.
+6. Move Motion Score playback onto a deterministic scheduler, then extend editing and DAW recording.
+7. Run compatibility, soak, package and hardware/DAW gates before publishing v0.5.0.
+
+## Preserved baseline and regression contract
+
+| ID | Capability | Status | Evidence / limits |
 | --- | --- | --- | --- |
-| Partial in 0.4.0 | Connection wizard | A guided MIDI and audio setup with test note, audio meters, saved routing profiles, and explicit connection status | A fresh setup can verify MIDI messages and an audio round trip and report a missing route clearly |
-| 2 | Dedicated FL Studio controller profile | Gesture actions for transport, record, track selection, mixer controls, and plugin parameters through an FL controller script | Each action controls the intended FL function and provides feedback for the active target |
-| Control bridge implemented; live validation pending | Shared tempo and transport | Select a clock master and make TouchMusic follow FL tempo, playback, and bar position | Capture and chord changes remain aligned during sustained playback and recover correctly after stop/restart |
-| Implemented in 0.3.0; live check pending | Gesture calibration and precision | Calibrated movement range, adjustable sensitivity, dead zones, pose timing, and a visible parameter/action overlay | Deliberate gestures work consistently while small incidental movement avoids unwanted changes |
-| Studio workspaces in 0.4.0; compact layouts pending | Performance UI | Large active voice, key, chord and recording displays, loop progress indicators, compact mode, and clear advanced controls | Essential performance controls stay visible at supported screen sizes and normal Windows scaling |
-| 6 | Recording calibration | Measure routing and conversion delay, save a profile, and apply the measured recording offset | Recorded transients align against a reference within a measured tolerance shown to the user |
+| B01 | Standalone vocal effects, pitch correction, key/scale/chord targets, Natural/Tight/Hard presets, formant/vibrato controls | Verified | Existing automated suite retained. Live sound quality is a listening test. |
+| B02 | Local Seed-VC character conversion and voice switching | Implemented | Existing conversion/provenance tests retained; references are user-owned assets. GPU throughput and voice similarity need model/hardware-specific measurements. |
+| B03 | Import player with waveform, zoom, draggable 1-8 second reference selection, audition and quality suggestions | Verified | Existing picker/quality tests. Suggestions use level/silence heuristics, not vocal separation. |
+| B04 | Four 120-second loop tracks, level/mute/restart, overdub, four undo states/redo, feedback, edge fades | Verified | Existing audio/looper behavior tests. Legacy captured loops stay mono. |
+| B05 | Beat/bar scheduling, count-in, fixed-bar capture, tap tempo, 4/4 metronome | Verified | Sample-clock tests. Existing loops retain recorded speed after tempo changes. |
+| B06 | Reverse, half/double speed and eighth-note stutter | Verified | Automated loop tests; varispeed changes pitch. Current exports preserve the original clip, not playback tricks. |
+| B07 | Finger counts/fists/pinch, continuous axes, calibration, smoothing, dead zones, hold timing, rehearsal, freeze | Verified | Mapper/precision tests. Physical camera usability is a separate check. |
+| B08 | Five voice slots, eight macro slots, scenes, stage view, emergency mute | Verified | Existing macro/stage/UI tests. Macro recursion is rejected. |
+| B09 | Portable skits, WAV stems, aligned export, recovery/history and ordered setlists | Verified | Existing project/recovery/alignment tests. Recovery preserves completed assets, not an active take or undo history. |
+| B10 | MIDI CC/notes/chords, channel/velocity, timed note release and panic | Verified | Mock-port behavior tests. Physical MIDI routing remains unverified. |
+| B11 | Studio workspaces/menu bar, guided standalone setup, profiles, diagnostics, output test | Verified | Qt/diagnostic tests. A test tone is not a measured loopback calibration. |
+| B12 | Voice comparison lab with shared phrase, A/B references/quality, preview, metrics and WAV export | Verified | Automated audition tests. GPU listening comparison remains pending. |
+| B13 | Native Windows VST3 control bridge, ten automation controls, tempo/PPQ and backing transport chase | Verified | v0.4.0: 47 SDK validator tests plus real Pedalboard hosting, passthrough and UDP automation. Live FL testing pending; DAW audio is unchanged in this bridge. |
+| B14 | Saved plugin order, bypass, normalized parameters and eight gesture knob bindings | Verified | Existing rack tests, pending-review restore, plus new isolated facade tests. Native opaque state is not yet persisted. |
 
-Clock synchronization must address tempo changes and the playback speed of existing loops. The current looper keeps existing clips at their recorded speed.
+## Remaining integration and production work
 
-## FL Studio test sequence
+| ID | Priority | Requirement | Status | Completion gate |
+| --- | --- | --- | --- | --- |
+| P01 | P0 | Backward compatibility and explicit session migrations | In Progress | Old v1 skits/presets/mappings load without native auto-load or score auto-play. Add checked migrations and real archived fixtures before changing loop/assets schemas. |
+| P02 | P0 | Plugin opaque state/presets | Planned | Capture bounded native state only in isolated workers, store content-addressed blobs, round-trip portable projects and verify checksums. Preserve normalized settings fallback. |
+| P03 | P0 | Single-instance session ownership | Planned | Prevent concurrent recovery/settings writers and provide deliberate handoff. |
+| P04 | P0 | Device hotplug and unavailable-device recovery | Planned | Explain missing devices; avoid silently opening an unintended mic/output; recover after disconnect/reconnect. |
+| P05 | P0 | Soak tests and fault injection | In Progress | Worker termination/watchdog tests exist. Add worker restart/editor/AI stress, queue pressure, 60-minute performance and resource leak checks. |
+| P06 | P1 | Plugin latency compensation | Planned | Separate declared plugin delay, worker buffering, converter delay and driver delay. Compensate parallel/stem paths and react safely to latency changes. V50-04 onset probe is not full PDC. |
+| P07 | P1 | Recording/round-trip calibration | Planned | Measure routing and AI delay with a reference; save offsets and verify transient alignment tolerance. |
+| P08 | P1 | DAW connection wizard | In Progress | Standalone profiles/meters/test tone exist. Add MIDI receive verification, route round trip and active DAW status. |
+| P09 | P1 | FL Studio controller profile | Planned | Controller script for transport, recording, track/mixer selection, parameters and feedback. |
+| P10 | P1 | Physical FL Studio connection checks | Blocked | User uninstalled FL Studio after failure. Resume after reinstall; follow the sequence below. |
+| P11 | P1 | loopMIDI and VB-CABLE guided options | Planned | Document optional routes with official links and explain when interface loopback/existing ports suffice. Never promise audio transfer over MIDI. |
+| P12 | P1 | Pitch-preserving loop tempo follow | Planned | Prepare stretching outside callback; maintain beat alignment across tempo/transport changes without changing vocal pitch. |
+| P13 | P1 | Separate vocal/loop/backing outputs | Planned | Driver channel mapping, explicit monitor/record buses, saved routing and verified multi-output behavior. |
+| P14 | P1 | Compact/scalable performance layouts | Planned | Test supported resolutions/Windows scaling, accessible labels, keyboard navigation and essential control visibility. Current sidebar/workspaces retained. |
+| P15 | P1 | Character ensemble and dialogue/duet scenes | Planned | Offline dual conversion first; independent levels/stems; measure GPU/memory before promising live two-character AI. |
+| P16 | P1 | Signed installers and downloadable package release | In Progress | Existing setup ZIP, wheel, sdist, hashes, GitHub release and PyPI trusted publishing retained. Add signing/provenance and clean-install verification. No v0.5.0 release before its gates. |
+| P17 | P1 | macOS/Linux | Planned | Camera/audio backends, singing runtime, native host, packaging and platform CI/hardware evidence. Catalog portability is not app support. |
+| P18 | P2 | Parallel effects chains and send/return buses | Planned | Depend on stereo buses and PDC; bounded mixing, headroom and state persistence. |
+| P19 | P2 | Plugin marketplace / guided installations | Planned | Extend curated catalog, official/version-pinned assets, license review, integrity/provenance, manual confirmation of external installers. Community catalogs are references, not trusted executable sources. |
+| P20 | P2 | AI-assisted vocal FX selection / stage crew assistant | Planned | Local constrained suggestions for clipping, routes and recipes; user explicitly applies changes. No unreviewed downloads or opaque automation. |
+| P21 | P2 | Gesture-controlled modular synthesizer | Planned | Build on V50-09 and validated Cardinal/Surge support; presets, modulation and panic behavior. |
+| P22 | P2 | Chord voicings, progressions and held-note performance | Planned | Explicit note lifetimes, voice leading and host/motion scheduling. |
+| P23 | P2 | Vocal separation for mixed-song references | Planned | Optional model, quality preview, resource/license checks and fallback to user selection. |
+| P24 | P2 | Gapless song transitions | Planned | Explicit backing/loop carryover and safe reference/plugin preloading. |
+| P25 | P2 | Character stage directions | Planned | Hand zones, dialogue/duet scenes and separate character stems; consolidate with P15 rather than duplicate an ensemble engine. |
+| P26 | P2 | Shadow rehearsal | Planned | Replay tracking signals with intended/triggered action comparison while suppressing audio/MIDI side effects. Distinct from Motion Score performing output. |
+| P27 | P2 | Latency-aware scene preparation | Planned | Prewarm next character/effects off callback and expose a measurable readiness budget. |
+| P28 | P2 | Shareable performance recipes | Planned | Package mappings, macros and required effect identities without licensed binaries or private voice references. |
+| P29 | P2 | Gesture grammar | Planned | Shape + movement + held sequences, explicit conflict resolution and rehearsal preview. |
+| P30 | P2 | Expanded tuning/harmony plugin recipes | Planned | Benchmark SnapTune/LyraTune against built-in tuning using the same source/key/quality metrics and listening tests. Publisher latency claims are not TouchMusic measurements. |
 
-- [ ] Confirm the current TouchMusic build opens from the existing desktop shortcut.
-- [ ] Check standalone microphone, pitch correction, backing playback, loops, and voice conversion.
-- [ ] Inventory available MIDI ports and audio input/output devices.
-- [ ] Test MIDI C4 reaching an FL instrument through an available route.
-- [ ] Link one FL knob to a gesture CC and verify the channel and controller number.
-- [ ] Test gesture notes and chord actions, then disarm gestures and confirm notes stop.
-- [ ] Route the wet vocal into an FL Mixer insert and record a short phrase.
-- [ ] Measure audio timing and check for feedback or duplicate monitoring.
-- [ ] Save the working configuration and verify it after restarting both apps.
+## Plugin candidates and engineering tools
 
-Testing can start with the available hardware and drivers. An existing MIDI route or audio-interface loopback may provide the connection. loopMIDI and VB-CABLE are documented software options when the corresponding route is missing.
+Authoritative results are in [plugin compatibility matrix](docs/PLUGIN_COMPATIBILITY.md). Exact version, binary hash, host/rate/block size, parameter, stereo, latency, editor, hardware and DAW evidence must accompany a compatibility claim. Unknown versions stay Unknown.
 
-## Suggested standalone work before FL testing
+- Vocal candidates: SnapTune, Graillon 3, MAutoPitch, LyraTune, OpenVoxTuner, NoteForge.
+- Effects: TDR Nova, TDR Kotelnikov, Valhalla Supermassive, Dragonfly Reverb, ChowMatrix, BYOD, MFreeFXBundle.
+- Instruments: Surge XT and Cardinal, pending V50-09.
+- SDK/host: Steinberg VST3 SDK and Spotify Pedalboard are already used.
+- Pluginval headless validation: Planned. Add a pinned validator and archived logs to CI for our bridge and an optional local validation workflow for installed effects.
+- EnterOutside/vst-loader: Planned reference review; do not import code without a confirmed applicable license.
+- gr8monk3ys/VSTs: Planned catalog-reference review. Independently verify every publisher URL/license/hash; do not copy claimed catalog counts or run its downloader implicitly.
+- Proposed four-slot recipe: pitch correction -> dynamic EQ -> compression -> reverb/delay. It is a recipe candidate, not four certified installed effects.
 
-The approved standalone increment is implemented in 0.2.0. Live hardware checks remain part of user testing.
+## Consolidation and resolved conflicts
 
-| Priority | Candidate | Intended result |
-| --- | --- | --- |
-| Complete | Reference quality assistant | Flag silence and clipping, suggest candidate vocal sections, and let the user audition and choose them |
-| Complete | Looper overdubbing | Add another layer to a playing loop with layer undo/redo and controlled feedback |
-| Complete | Count-in and fixed-bar capture | One- or two-bar count-in and automatic capture lengths of 1, 2, 4, or 8 bars |
-| Complete | Crash recovery | Recover completed loops and the last usable skit after an unexpected exit |
-| Complete | Setlists | Recall per-song backing, key, tempo, voices, chords, and gesture assignments in performance order |
-| Existing | Clearer vocal controls | Show bypass reasons, provide direct tuning strength/speed access, and audition dry versus processed sound |
-| Complete | Loop seam treatment | Optional short edge fades to reduce clicks at loop boundaries while preserving the chosen loop length |
+- Standalone plugin hosting and the DAW bridge are independent systems. V50-01 is plugin fault containment; V50-08 is audio transport. The existing control bridge satisfies neither full audio transport nor sample-accurate synchronization.
+- Automatic discovery means finding paths without loading native code. Explicit isolated scans and reviewed restores remain required.
+- A native editor is the third-party UI in its worker process. Its exposed parameter changes can persist now; complete opaque preset state is P02.
+- Free download, open-source license, redistribution rights, and measured compatibility are separate properties.
+- Instruments get their own MIDI/synthesis bus; they do not silently enter the vocal effect chain.
+- Stereo live/output work must preserve old mono loops and archives. A schema migration and stereo asset work remain explicit.
+- Motion Score records automation; shadow rehearsal diagnoses tracking without emitting performance actions.
+- Gesture macros, finger mappings, precision controls, stage view and beat-synced looping already exist. Extend them without building duplicate subsystems.
 
-Recovery preserves completed assets, not an active take or undo history. Setlist recall stops audio and disarms gestures. Reference suggestions use level and silence heuristics, not vocal detection. Four undo states are retained per loop. Count-in clicks are monitoring-only.
+## Verification and release gates
 
-## Later exploration
+- [ ] All ten V50 requirements have implemented acceptance checks, with unperformed live checks explicitly identified.
+- [ ] Retained v0.4.0 regression suite plus tests for every new subsystem and archived session fixtures.
+- [ ] Worker fault/timeout/restart, state restore, note-off/panic, malformed IPC and sustained queue pressure tests.
+- [ ] Versioned compatibility reports and SDK/pluginval logs; no ambiguous plugin-version claims.
+- [ ] CPU, GPU, memory, callback/deadline and dropout comparison against v0.4.0 under the same scenario; see [benchmarks](docs/BENCHMARKS.md).
+- [ ] Stereo playback/recording and saved-performance migration verified.
+- [ ] Wheel/sdist metadata, isolated install, entry point, setup ZIP contents/hashes and native bridge validation verified.
+- [ ] Actual microphone, speakers/headphones, webcam and listening quality checked on named hardware.
+- [ ] Actual wet AI return, automation, transport and restart tested in named DAW/version with measured latency.
+- [ ] README, release notes, architecture and technical debt reflect the exact delivered behavior.
 
-- Implemented experimentally in 0.4.0: a native VST3 control bridge with host automation, soft tempo/PPQ anchoring and optional backing transport chase. It passes DAW audio through unchanged. Full AI audio transport through a plugin and live FL Studio validation remain pending.
-- Separate vocal, loop, and backing outputs where the selected audio driver supports them.
-- More expressive chord voicings, chord progressions, and held-note MIDI performance.
-- Optional vocal separation before creating a reference from a mixed song.
+## FL Studio hardware test sequence
 
-Each release should update its version, notes, compatibility information, and verification results. Features needing a live DAW or device check stay pending until that check is recorded.
+Currently Blocked on reinstallation. No end-to-end FL connection is claimed.
 
-## Additional candidates after this increment
+1. Verify TouchMusic standalone mic, headphones, camera, tuning, conversion and loops.
+2. Inventory audio drivers/devices and MIDI routes. Use interface loopback or existing routes when available; loopMIDI/VB-CABLE are optional missing-route solutions.
+3. Send C4 and gesture chords into an FL instrument; verify channel, velocity and panic after disarm.
+4. Link one FL parameter to gesture CC and verify target feedback.
+5. Check native control bridge tempo, automation and stop/restart behavior.
+6. Once V50-08 exists, return wet AI audio on an FL insert, record a phrase and measure input-to-output timing without duplicate monitoring/feedback.
+7. Save both configurations, restart both applications, and repeat a sustained performance.
 
-- Gapless song transitions with explicit backing/loop carryover rules.
-- Per-loop pitch-preserving time stretch when the master tempo changes.
-- Implemented in 0.3.0: gesture control for capture length, overdub feedback, loop-edge treatment, tempo, key, chords, and count-in.
-- Implemented in 0.4.0: selectable recovery history, up to five prior snapshots with a 256 MiB prior-backup budget.
-- Stage view with larger controls implemented in 0.3.0; configurable displays and further compact layouts remain candidates.
-
-## Standalone progress in 0.3.0
-
-- Implemented: movement calibration, deadband, smoothing, sensitivity, pose hold and pinch timing, movement freeze, action/value feedback.
-- Implemented: stage view and fullscreen, emergency mute shortcut, expanded musical gesture targets and actions.
-- Implemented: manual output-test tone, excluded from loop capture and recordings.
-- Fixed: conflicting capture/overdub commands during a queued count-in.
-- Verified: 72 automated behavior tests, desktop layout checks, and installed package startup.
-- Pending: live webcam usability and speaker checks. The output-test tone is an audible playback aid, not an automated connection wizard or measured audio round trip.
-- FL Studio testing is paused because the application was uninstalled after failing. Resume the existing test sequence after reinstallation. No end-to-end FL connection is claimed.
-
-## Studio increment in 0.4.0
-
-- Implemented: menu bar and ten sidebar workspaces, guided standalone audio setup, named device profiles, readable diagnostics and local report export.
-- Implemented: eight gesture macro slots, up to eight immediate actions per slot. Loop/chord actions retain their own scheduling. Recursive macros are rejected.
-- Implemented: voice comparison lab, 1..8 second source phrase, two reference/quality variants, same inference worker, preview output selection, render/level metrics and WAV export.
-- Implemented: four-slot VST3 audio effect rack, generic normalized controls, eight gesture parameter bindings, bypass/order/parameter snapshots, explicit review before loading a saved native rack.
-- Implemented: reverse, half/double speed and eighth-note stutter for loops. Half/double speed changes pitch, so pitch-preserving tempo matching is still pending. Exports preserve the captured clip rather than rendering playback tricks.
-- Implemented: Windows x64 native VST3 control bridge, bounded localhost protocol, ten automation controls, soft host-clock anchoring and optional backing chase. It is a control bridge, not AI audio processing inside the DAW.
-- Verified: 85 Python behavior tests, 47 VST3 validator tests, actual VST3 hosting and native-to-Python automation, and a real TDR Nova 2.2.3 check using 100 live-sized blocks plus a gesture parameter update.
-- Live checks pending: microphone/speaker round trip, long performances, GPU voice-quality comparison by listening, hardware timing, and FL Studio after reinstallation.
-
-## Next engineering priorities
-
-| Priority | Work | Why it matters |
-| --- | --- | --- |
-| 1 | Isolated plugin worker and native editor broker | A misbehaving native effect should not take down the performance app; editors should remain responsive alongside camera gestures |
-| 2 | Full DAW audio bridge and declared latency | Route DAW input through TouchMusic and return wet audio without a separate virtual cable, with sample provenance, buffering and clock-drift handling |
-| 3 | Pitch-preserving loop time stretch | Existing loops should follow tempo changes while retaining vocal pitch; prepare changes outside the audio callback |
-| 4 | Measured audio calibration | Measure real routing delay and conversion latency, with repeatable recording alignment checks |
-| 5 | Character ensemble | Two character conversions with independent levels; benchmark GPU/memory budget and provide offline rendering before promising live dual conversion |
-| 6 | Single-instance ownership, session migrations and device hotplug | Preserve recovery integrity, migrate saved performances safely, and explain unavailable devices during a show |
-| 7 | macOS and Linux support | Implement and test platform camera backends, audio routing, singing-engine setup, packaging and native host compatibility |
-| 8 | Signed installers, compatibility matrix and soak tests | Strengthen release provenance, third-party plugin confidence and sustained performance reliability |
-
-## Out-of-the-box candidates
-
-| Idea | Why add it | What it enables |
-| --- | --- | --- |
-| Motion Score | A good hand performance can be as valuable as an audio take | Record effect gestures against bars, edit movement envelopes, and replay them with a loop |
-| Character stage directions | Skits need more than a voice dropdown | Assign characters to hand zones, recall dialogue/duet scenes, and render separate character stems |
-| Shadow rehearsal | Unexpected gestures are hard to diagnose during a show | Replay recorded tracking signals with an action timeline and compare intended versus triggered scenes without emitting MIDI or changing audio |
-| Latency-aware scene preparation | AI references and phrase buffers take time to prepare | Prewarm the next character and schedule scene readiness against upcoming bars with a visible timing budget |
-| Performance recipes | Complex setups should be repeatable and easy to share | Package mappings, macro sequences and effect requirements without redistributing licensed plugins or personal references |
-| Gesture grammar | Finger counts alone limit expression | Combine hand shape, movement direction and held gestures into explicit musical phrases, with rehearsal previews |
-| Stage crew assistant | Routine setup interrupts creativity | Offer local, constrained suggestions for routing, clipping and scene preparation, with explicit user control over changes |
-
-These are proposed directions, not implemented features. A production claim requires sustained hardware tests, plugin isolation and a clear supported-host matrix in addition to automated unit checks.
+Design: [architecture](docs/ARCHITECTURE.md). Known limitations and remediation: [technical debt](docs/TECHNICAL_DEBT.md). Release history: [release notes](release-notes.md).
