@@ -1,48 +1,55 @@
 # Release benchmarks and validation evidence
 
-Recorded 2026-11-28 on Windows 10.0.26300, Python 3.11.9, NumPy 1.26.4. These are software measurements from this development host, not audio-hardware validation.
+Recorded 2026-11-28 on Windows 10.0.26300, Python 3.11.9 and NumPy 1.26.4. Automated/software measurements below do not establish live microphone, speaker, camera, listening or DAW quality. FL Studio testing is delegated to external testers.
 
-## Reproducible comparison
+## Synthetic audio comparison
 
-`tools/benchmark_audio.py` renders 2000 x 512-frame, 48 kHz blocks after 64 warmup blocks. Input is a fixed 220 Hz sine at amplitude 0.15. Default built-in effects are active; external plugins, AI, webcam and real audio devices are absent. Runs execute sequentially in fresh processes. The baseline source is the published v0.4.0 GitHub archive; the candidate is this development checkout.
+`tools/benchmark_audio.py` renders 2000 x 512-frame blocks at 48 kHz after 64 warmup blocks: fixed 220 Hz input, default built-in effects, no AI/external effects/webcam/device stream. Published v0.4.0 and current development source run in sequential fresh processes. The desktop is not otherwise controlled; short timings are noisy.
 
-| Measurement | v0.4.0 | v0.5.0 development | Interpretation |
-| --- | --- | --- | --- |
-| Audio represented | 21.333 s | 21.333 s | Computed faster than real time |
-| Wall time | 0.39845 s | 0.46962 s | Includes Python scheduling and measurement overhead |
-| Process CPU time | 0.375 s | 0.46875 s | Whole measured loop; not system CPU utilization |
-| Median block compute | 0.18990 ms | 0.21830 ms | Candidate includes stereo mix handling |
-| P95 block compute | 0.23960 ms | 0.33814 ms | Candidate regression of about 0.099 ms in this run |
-| Maximum block compute | 0.64610 ms | 1.00120 ms | Short-run observation, not worst-case guarantee |
-| Peak process working set | 66,945,024 bytes | 66,801,664 bytes | No native worker or AI memory included |
-| Synthetic blocks exceeding 10.667 ms | 0 | 0 | Software deadline proxy only |
-| Physical audio dropouts | Not measured | Not measured | Requires a running audio stream |
-| Hardware input/output round trip | Not measured | Not measured | Requires loopback calibration |
-| GPU AI compute / allocated peak memory | Not measured | Not measured | No model inference in this scenario |
+| Measurement | v0.4.0 | 0.5.0.dev3 |
+| --- | --- | --- |
+| Wall seconds | 0.398451 | 0.556497 |
+| Process CPU seconds | 0.375 | 0.5625 |
+| Median block ms | 0.1899 | 0.24575 |
+| P95 block ms | 0.239605 | 0.443345 |
+| Maximum block ms | 0.6461 | 1.4269 |
+| Peak process memory bytes | 6.6945e+07 | 6.7158e+07 |
+| Synthetic deadline misses | 0 | 0 |
 
-The raw `cpu_percent_of_one_core` field describes a busy, unpaced render process. It must not be presented as live audio CPU usage. System-wide NVIDIA telemetry happened to report an RTX 5060 with about 2122 MiB in use; that includes unrelated applications and does not measure TouchMusic AI memory or performance.
+Both represent 21.333 seconds of audio, rendered faster than real time. Candidate P95 is higher in this run; these are measured compute costs, not driver latency or live CPU utilization. Neither run measures physical dropouts or input/output round trip. System-wide NVIDIA snapshots include unrelated applications and cannot attribute GPU usage to TouchMusic.
 
-Raw records: [baseline](verification/benchmark-0.4.0.json), [candidate](verification/benchmark-0.5.0-development.json). Individual runs are noisy. Broader AI/camera/plugin workloads and repeated longer tests remain required before production claims.
+Raw [baseline](verification/benchmark-0.4.0.json) and [dev3](verification/benchmark-0.5.0.dev3.json). Historical dev1/dev2 records remain available without replacing them.
 
-## Isolated effect probe
+## Actual GPU conversion comparison
 
-TDR Nova 2.2.3, Pedalboard 0.9.26, 48 kHz, 512 frames:
+`tools/benchmark_ai.py` runs the actual local Seed-VC backend on the same two private references, two-second source and default four inference steps. The reports export metrics only. RTX 5060, PyTorch 2.11.0+cu128, sequential fresh processes, offline cached model assets. Both source revisions have the same neural backend SHA-256, so this is a preservation/measurement check, not evidence of a faster new model.
 
-- The isolated 100-block scan passed load, finite stereo output and one normalized parameter readback.
-- Scan RPC p50 was 0.666 ms and p95 0.933 ms; default impulse onset was 184 samples. This onset is not a declared/plugin/hardware round-trip latency measurement.
-- A later 104-block scheduled run at nominal 11 ms pacing had zero worker errors and zero fallback segments after removing redundant unchanged parameter writes. It lasted about 1.21 seconds, so it is not a soak test.
-- The scheduled external rack intentionally adds 2048 frames, 42.667 ms at 48 kHz. A v0.4 in-process rack had no equivalent scheduling buffer. Plugin DSP, built-in DSP, AI and driver delay are additional.
+| Measurement | v0.4.0 | 0.5.0.dev3 |
+| --- | --- | --- |
+| Model load seconds | 38.0343 | 15.512 |
+| Conversion CPU seconds | 2.15625 | 2.10938 |
+| Peak process memory bytes | 3.59527e+09 | 3.59848e+09 |
+| CUDA allocated peak bytes | 2.05771e+09 | 2.05771e+09 |
+| CUDA reserved peak bytes | 2.29638e+09 | 2.29638e+09 |
+| First two-second conversion | 1.007924 s | 0.604661 s |
+| Second two-second conversion | 0.378978 s | 0.374531 s |
 
-Raw scan: [exact binary report](verification/tdr-nova-2.2.3-scan.json). See [compatibility matrix](PLUGIN_COMPATIBILITY.md) for hash/version and unperformed checks.
+Load/first-call variation includes cache and initialization effects. Two calls are insufficient for throughput or similarity guarantees. Source/reference names and audio stay private. Raw [baseline GPU](verification/ai-benchmark-0.4.0.json) and [dev3 GPU/native return](verification/ai-benchmark-0.5.0.dev3.json).
 
-## Release gate checklist
+The dev3 native host probe also passed real streaming CUDA conversion through TouchMusic Audio Bridge: 750 packets, no input packet gaps, zero dropped conversion chunks, 619 matched real-converted output blocks and finite nonzero stereo. It recorded **122 converter underruns** and last inference time about 409.3 ms. Underruns are converter availability counters, not measured device dropouts. They remain a production performance limitation. This probe used actual native hosting, no physical audio or DAW.
 
-Automated: preserve all original 85 tests and run the expanded worker/protocol/queue/stereo/learning/score/UI suite. Build wheel and sdist, check metadata, install in a separate location, check the entry point and inspect the setup ZIP allowlist. Retain v0.4.0's 47 native SDK checks and actual host/control transport probe; rerun when the native bridge changes.
+## Endurance and worker lifecycle
 
-Still required for v0.5.0: sustained native worker/editor restarts, a 60-minute named-hardware run, webcam gestures, live mic/headphones and listening quality, model-specific CPU/GPU/memory measurements, actual audio dropouts/round-trip calibration, instrument note lifecycle and a real wet-AI DAW return. FL Studio testing is blocked until reinstallation. Never replace these with synthetic results or a passing unit-test count.
+`tools/verify_performance.py` rendered 337500 blocks, representing 3600 seconds, in 120.324 wall seconds. Every output was finite and bounded; zero compute blocks exceeded 10.667 ms, maximum 9.4593 ms, CPU 117.734 s, peak process memory 69,279,744 bytes. Ten real plugin restart/state cycles completed with zero owned workers left alive. [Raw report](verification/software-endurance-dev3.json).
 
-This development checkpoint passed 113 Python tests and reran 47 SDK checks against the unchanged compiled control bridge. Wheel/sdist metadata, a separate-target installed GUI/worker startup and setup archive allowlists also passed. [Verification record](verification/development-checks.json).
+This accelerated test is not a one-hour real-time hardware soak. It excludes webcam/AI/physical devices from the DSP loop; the optional worker cycle is separate. A named-hardware 60-minute combined-load run, trend-based memory leak check and physical dropout/round-trip measurements remain required.
 
-SnapTune 2.4.0 and LyraTune 0.6.7 also passed isolated 100-block scans. A paced SnapTune/Nova chain had zero pre-fault fallback segments, survived deliberate worker termination with finite stereo fallback, and explicitly restarted. See the compatibility matrix and raw fault report.
+## Plugin and bridge timing
 
-The dev2 candidate adds the empty instrument bus and was measured again: [dev2 synthetic CPU/memory/GPU telemetry record](verification/benchmark-0.5.0.dev2.json). No actual GPU inference, physical dropout or round-trip measurement was performed.
+The external rack intentionally adds 2048 frames, 42.667 ms at 48 kHz. Audio Bridge reports 4096 transport frames, 85.333 ms. AI, vendor plugin DSP and driver latency are additional; full compensation remains unfinished. Scanner impulse onset is the default effect response, not declared plugin or total hardware latency.
+
+See the [exact compatibility matrix](PLUGIN_COMPATIBILITY.md) for per-plugin rates/blocks, parameter sweeps, state/editor results and failed cases. Both compiled bridges passed 47 SDK validator checks each. Actual control hosting and 90-block standalone DSP audio return pass. Automated Qt/worker/protocol/MIDI/state/transport/device-failure checks retain v0.4.0 behavior. Package metadata, installed startup and allowlists are recorded in [development checks](verification/development-checks.json).
+
+## Remaining release verification
+
+Actual microphone/headphones, webcam gestures, listening quality, hardware disconnect/reconnect, combined-load soak, full delay compensation, signed/clean-machine distribution and DAW-version-specific wet-AI routing remain unverified. Pluginval is planned. Never substitute a unit-test count, SDK result, GPU run or synthetic endurance result for these checks.

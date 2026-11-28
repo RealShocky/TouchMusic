@@ -12,7 +12,7 @@ Updated 2026-11-28. This is the single requirements and delivery tracker. It sup
 
 Priority P0 is stability and compatibility, P1 is production functionality, P2 is expansion. Windows x64 is the supported platform. Python portability does not establish macOS/Linux support.
 
-Current automated checkpoint: **121 Python tests**, **94 native SDK checks across two bridges**, actual native host/control transport, package metadata and installed GUI/worker startup passed. [Evidence](docs/verification/development-checks.json). These are software checks, not microphone/camera/DAW validation.
+Current automated checkpoint: **135 Python tests**, **94 native SDK checks across two bridges**, actual native host/control transport, package metadata and installed GUI/worker startup passed. [Evidence](docs/verification/development-checks.json). These are software checks, not microphone/camera/DAW validation.
 
 The published baseline is **v0.4.0**. **v0.5.0 is in development, not released or production certified.** The ten requested v0.5.0 capabilities below are the release scope. A partial implementation does not satisfy that release gate.
 
@@ -20,16 +20,16 @@ The published baseline is **v0.4.0**. **v0.5.0 is in development, not released o
 
 | ID | Priority | Requirement | Status | Dependencies and acceptance gate |
 | --- | --- | --- | --- | --- |
-| V50-01 | P0 | Isolated VST3 effect hosting | In Progress | Owned child process, bounded IPC/queues, watchdog, delayed dry fallback, explicit restart and transactional load implemented. Automated termination/timeout tests pass. Finish lifecycle/long-session stress checks and recovery UX. A process boundary is not a malware sandbox. |
-| V50-02 | P0 | Plugin Center discovery and management | In Progress | Metadata-only discovery of standard/user folders, manual scan/load, binary-identity cache and failed-scan quarantine implemented. Complete asynchronous rack load and scan invalidation/lifecycle tests. |
-| V50-03 | P1 | Curated catalog and official downloads | In Progress | Fifteen publisher entries, license labels, official links and checksum-pinned TDR Nova 2.2.3, SnapTune 2.4.0 and LyraTune 0.6.7 archive staging implemented. Review/version-pin further downloads individually. Never equate freeware with redistribution rights. |
-| V50-04 | P0 | Compatibility scanner | In Progress | Separate-process load, 100-block stereo/finite-output probe, default impulse onset, parameter readback, binary SHA-256 and JSON reports implemented. Add multiple rates/block sizes, pluginval integration and sustained automation stress. Impulse onset is not declared plugin latency or hardware round trip. |
-| V50-05 | P1 | Native plugin editor interfaces | Implemented | Actual Pedalboard show_editor runs on the plugin worker main thread. Audio must be stopped, UI remains responsive, exposed parameters synchronize on close. Broker routing tested; actual vendor editor opening/closing remains unverified. Opaque state persistence is a separate dependency. |
+| V50-01 | P0 | Isolated VST3 effect hosting | In Progress | Owned child process, bounded IPC/queues, watchdog, delayed dry fallback, explicit restart and transactional load implemented. Automated termination/timeout tests pass. Async load/cancellation, parent-exit cleanup and ten real worker/state restart cycles pass. Accelerated one-hour DSP endurance passes; live combined-load soak and recovery UX remain. A process boundary is not a malware sandbox. |
+| V50-02 | P0 | Plugin Center discovery and management | In Progress | Metadata-only discovery of standard/user folders, manual scan/load, binary-identity cache and failed-scan quarantine implemented. Async effect/instrument loading, GUI responsiveness and shutdown cancellation are implemented and regression tested. Broader scan invalidation and custom-folder usability remain. |
+| V50-03 | P1 | Curated catalog and official downloads | In Progress | Fifteen publisher entries, license labels, official links and checksum-pinned TDR Nova 2.2.3, SnapTune 2.4.0 , LyraTune 0.6.7 and Surge XT 1.3.4 archive staging implemented. Review/version-pin further downloads individually. Never equate freeware with redistribution rights. |
+| V50-04 | P0 | Compatibility scanner | In Progress | Separate-process load, 100-block stereo/finite-output probe, default impulse onset, parameter readback, binary SHA-256 and JSON reports implemented. Nine rate/block combinations and up to four parameter sweeps implemented. Nova/Lyra pass 9/9; SnapTune fails the host full-block contract at 96 kHz (6/9 pass). Exact results are archived. Pluginval and sustained automation stress remain. Impulse onset is not declared plugin latency or hardware round trip. |
+| V50-05 | P1 | Native plugin editor interfaces | Implemented | Actual Pedalboard show_editor runs on the plugin worker main thread. Audio must be stopped, UI remains responsive, exposed parameters synchronize on close. SnapTune 2.4.0 actual editor API open/event-close passed; no manual visual interaction is claimed. Opaque presets capture after close and on explicit capture; broader editor/modal-dialog usability remains. |
 | V50-06 | P0 | Stereo audio engine | In Progress | External stereo FX survive through hardware callback and new stereo performance/stem WAVs; mono processing API and legacy loops remain compatible. Stereo regression test passes. Stereo backing/reference/loop assets and full project migration remain planned. |
 | V50-07 | P1 | Gesture Learn | Implemented | Select effect parameter/knob and move a hand axis. Deliberate dominant motion binds height, horizontal position or spread, with timeout/cancel and disarmed performance. Pure and UI regression tests pass; physical webcam validation remains pending. |
-| V50-08 | P1 | Full DAW AI audio bridge | In Progress | Native Audio Bridge plus opt-in 48 kHz stereo receiver implemented. Actual host returned 90 blocks matching standalone DSP; 47 SDK checks passed. The existing control bridge is preserved. Transport delay is 4096 frames; full AI/FX compensation, offline rendering, additional rates and actual FL/real-model checks remain pending. |
-| V50-09 | P1 | Isolated VST3 instruments | In Progress | Separate stereo synth worker, timestamped MIDI, bounded notes, retrigger-safe release, panic, gesture notes/chords/knobs, explicit restore and recording stem implemented. Automated MIDI/backend tests pass. Surge XT 1.3.4 generated finite stereo over 70 paced blocks with zero worker errors/fallback. The normalized adapter is pinned to Pedalboard 0.9.26; vendor/editor/physical/DAW checks remain distinct. |
-| V50-10 | P1 | Motion Score | In Progress | Beat-based movement/action recording, event editing/deletion, JSON import/export, explicit replay and optional saved-performance data implemented. Automated event/tempo/persistence tests pass. Current playback uses the 100 ms UI timer; sample-accurate scheduling, visual envelope editing and DAW automation capture remain planned. |
+| V50-08 | P1 | Full DAW AI audio bridge | In Progress | Native Audio Bridge plus opt-in 48 kHz stereo receiver implemented. Actual host returned 90 blocks matching standalone DSP; 47 SDK checks passed. The existing control bridge is preserved. Transport delay is 4096 frames; full AI/FX compensation, offline rendering, additional rates and actual FL checks remain delegated. Real GPU conversion through the actual native host passed with 122 converter underruns, no packet gaps and no dropped chunks; this is not DAW or listening validation. |
+| V50-09 | P1 | Isolated VST3 instruments | In Progress | Separate stereo synth worker, timestamped MIDI, bounded notes, retrigger-safe release, panic, gesture notes/chords/knobs, explicit restore and recording stem implemented. Automated MIDI/backend tests pass. Surge XT 1.3.4 generated finite stereo over 70 paced blocks with zero worker errors/fallback. The normalized adapter is pinned to Pedalboard 0.9.26; opaque-state restore and stereo chord rendering also pass in the reviewed-archive CI probe; editor/physical/DAW checks remain distinct. |
+| V50-10 | P1 | Motion Score | In Progress | Beat-based movement/action recording, event editing/deletion, JSON import/export, explicit replay and optional saved-performance data implemented. Automated event/tempo/persistence tests pass. Local DSP/chord/loop/note events now run at audio sample boundaries with tempo-aware scheduling and bounded overflow cancellation. Voice/macros/external MIDI use a 10 ms GUI relay; native knobs remain worker-quantized. Visual envelopes, host-seek policy and DAW automation capture remain planned. |
 
 ### Dependency order
 
@@ -46,7 +46,7 @@ The published baseline is **v0.4.0**. **v0.5.0 is in development, not released o
 | ID | Capability | Status | Evidence / limits |
 | --- | --- | --- | --- |
 | B01 | Standalone vocal effects, pitch correction, key/scale/chord targets, Natural/Tight/Hard presets, formant/vibrato controls | Verified | Existing automated suite retained. Live sound quality is a listening test. |
-| B02 | Local Seed-VC character conversion and voice switching | Implemented | Existing conversion/provenance tests retained; references are user-owned assets. GPU throughput and voice similarity need model/hardware-specific measurements. |
+| B02 | Local Seed-VC character conversion and voice switching | Implemented | Existing conversion/provenance tests retained; references are user-owned assets. Paired actual CUDA timing/memory measurements exist for baseline/dev3. Voice similarity and live listening remain unverified. |
 | B03 | Import player with waveform, zoom, draggable 1-8 second reference selection, audition and quality suggestions | Verified | Existing picker/quality tests. Suggestions use level/silence heuristics, not vocal separation. |
 | B04 | Four 120-second loop tracks, level/mute/restart, overdub, four undo states/redo, feedback, edge fades | Verified | Existing audio/looper behavior tests. Legacy captured loops stay mono. |
 | B05 | Beat/bar scheduling, count-in, fixed-bar capture, tap tempo, 4/4 metronome | Verified | Sample-clock tests. Existing loops retain recorded speed after tempo changes. |
@@ -56,24 +56,24 @@ The published baseline is **v0.4.0**. **v0.5.0 is in development, not released o
 | B09 | Portable skits, WAV stems, aligned export, recovery/history and ordered setlists | Verified | Existing project/recovery/alignment tests. Recovery preserves completed assets, not an active take or undo history. |
 | B10 | MIDI CC/notes/chords, channel/velocity, timed note release and panic | Verified | Mock-port behavior tests. Physical MIDI routing remains unverified. |
 | B11 | Studio workspaces/menu bar, guided standalone setup, profiles, diagnostics, output test | Verified | Qt/diagnostic tests. A test tone is not a measured loopback calibration. |
-| B12 | Voice comparison lab with shared phrase, A/B references/quality, preview, metrics and WAV export | Verified | Automated audition tests. GPU listening comparison remains pending. |
+| B12 | Voice comparison lab with shared phrase, A/B references/quality, preview, metrics and WAV export | Verified | Automated audition tests. GPU compute comparison passed; listening comparison remains pending. |
 | B13 | Native Windows VST3 control bridge, ten automation controls, tempo/PPQ and backing transport chase | Verified | v0.4.0: 47 SDK validator tests plus real Pedalboard hosting, passthrough and UDP automation. Live FL testing pending; DAW audio is unchanged in this bridge. |
-| B14 | Saved plugin order, bypass, normalized parameters and eight gesture knob bindings | Verified | Existing rack tests, pending-review restore, plus new isolated facade tests. Native opaque state is not yet persisted. |
+| B14 | Saved plugin order, bypass, normalized parameters and eight gesture knob bindings | Verified | Existing rack tests, pending-review restore, plus new isolated facade tests. Optional bounded native state is now captured and embedded with SHA-256 checks; old parameter-only sessions remain readable. |
 
 ## Remaining integration and production work
 
 | ID | Priority | Requirement | Status | Completion gate |
 | --- | --- | --- | --- | --- |
 | P01 | P0 | Backward compatibility and explicit session migrations | In Progress | Old v1 skits/presets/mappings load without native auto-load or score auto-play. Add checked migrations and real archived fixtures before changing loop/assets schemas. |
-| P02 | P0 | Plugin opaque state/presets | Planned | Capture bounded native state only in isolated workers, store content-addressed blobs, round-trip portable projects and verify checksums. Preserve normalized settings fallback. |
-| P03 | P0 | Single-instance session ownership | Planned | Prevent concurrent recovery/settings writers and provide deliberate handoff. |
-| P04 | P0 | Device hotplug and unavailable-device recovery | Planned | Explain missing devices; avoid silently opening an unintended mic/output; recover after disconnect/reconnect. |
-| P05 | P0 | Soak tests and fault injection | In Progress | Worker termination/watchdog tests exist. Add worker restart/editor/AI stress, queue pressure, 60-minute performance and resource leak checks. |
+| P02 | P0 | Plugin opaque state/presets | Verified | Automated portable/tamper/size/round-trip tests plus real Nova 2.2.3 and Surge XT 1.3.4 restore. 8 MiB/blob, 32 MiB/project; exact binary check and normalized overlay. Verification is software-only; broader vendor preset coverage remains. |
+| P03 | P0 | Single-instance session ownership | Verified | Per-data-directory ownership lock and focus handoff, with bounded local marker fallback if named pipes are unavailable. Automated Qt second-instance and reacquisition checks pass. |
+| P04 | P0 | Device hotplug and unavailable-device recovery | In Progress | Inactive stream detection closes resources, disarms gestures and explains refresh/reselect. Device identity is checked before start. Injected disconnect tests pass; actual unplug/reconnect remains untested. |
+| P05 | P0 | Soak tests and fault injection | In Progress | Worker termination/watchdog tests exist. Ten real plugin restart/state cycles leave zero owned workers. Accelerated 3600-second DSP run has zero invalid blocks/deadline misses. Real GPU/native-return check records underruns. Named-hardware 60-minute combined-load soak and leak trends remain. |
 | P06 | P1 | Plugin latency compensation | Planned | Separate declared plugin delay, worker buffering, converter delay and driver delay. Compensate parallel/stem paths and react safely to latency changes. V50-04 onset probe is not full PDC. |
 | P07 | P1 | Recording/round-trip calibration | Planned | Measure routing and AI delay with a reference; save offsets and verify transient alignment tolerance. |
 | P08 | P1 | DAW connection wizard | In Progress | Standalone profiles/meters/test tone exist. Add MIDI receive verification, route round trip and active DAW status. |
 | P09 | P1 | FL Studio controller profile | Planned | Controller script for transport, recording, track/mixer selection, parameters and feedback. |
-| P10 | P1 | Physical FL Studio connection checks | Blocked | User uninstalled FL Studio after failure. Resume after reinstall; follow the sequence below. |
+| P10 | P1 | Physical FL Studio connection checks | Blocked | Explicitly delegated by Mark to external testers. Await named DAW/version, routing, measured latency and restart results; developer does not run FL Studio testing. |
 | P11 | P1 | loopMIDI and VB-CABLE guided options | Planned | Document optional routes with official links and explain when interface loopback/existing ports suffice. Never promise audio transfer over MIDI. |
 | P12 | P1 | Pitch-preserving loop tempo follow | Planned | Prepare stretching outside callback; maintain beat alignment across tempo/transport changes without changing vocal pitch. |
 | P13 | P1 | Separate vocal/loop/backing outputs | Planned | Driver channel mapping, explicit monitor/record buses, saved routing and verified multi-output behavior. |
@@ -112,7 +112,7 @@ Authoritative results are in [plugin compatibility matrix](docs/PLUGIN_COMPATIBI
 
 - Standalone plugin hosting and the DAW bridge are independent systems. V50-01 is plugin fault containment; V50-08 is audio transport. The existing control bridge remains automation-only; the separate experimental Audio Bridge implements live audio return, with full latency compensation still pending.
 - Automatic discovery means finding paths without loading native code. Explicit isolated scans and reviewed restores remain required.
-- A native editor is the third-party UI in its worker process. Its exposed parameter changes can persist now; complete opaque preset state is P02.
+- A native editor is the third-party UI in its worker process. Exposed parameters and bounded opaque snapshots persist; capture and restore require audio stopped, exact installed binaries and explicit review.
 - Free download, open-source license, redistribution rights, and measured compatibility are separate properties.
 - Instruments get their own MIDI/synthesis bus; they do not silently enter the vocal effect chain.
 - Stereo live/output work must preserve old mono loops and archives. A schema migration and stereo asset work remain explicit.
@@ -122,7 +122,7 @@ Authoritative results are in [plugin compatibility matrix](docs/PLUGIN_COMPATIBI
 ## Verification and release gates
 
 - [ ] All ten V50 requirements have implemented acceptance checks, with unperformed live checks explicitly identified.
-- [ ] Retained v0.4.0 regression suite plus tests for every new subsystem and archived session fixtures.
+- [x] Retained v0.4.0 regression suite plus tests for new subsystems and archived v1 session fixtures (automated scope).
 - [ ] Worker fault/timeout/restart, state restore, note-off/panic, malformed IPC and sustained queue pressure tests.
 - [ ] Versioned compatibility reports and SDK/pluginval logs; no ambiguous plugin-version claims.
 - [ ] CPU, GPU, memory, callback/deadline and dropout comparison against v0.4.0 under the same scenario; see [benchmarks](docs/BENCHMARKS.md).
@@ -134,14 +134,14 @@ Authoritative results are in [plugin compatibility matrix](docs/PLUGIN_COMPATIBI
 
 ## FL Studio hardware test sequence
 
-Currently Blocked on reinstallation. No end-to-end FL connection is claimed.
+Delegated to external testers at Mark's request. No end-to-end FL connection is claimed. Use this checklist when they are available.
 
 1. Verify TouchMusic standalone mic, headphones, camera, tuning, conversion and loops.
 2. Inventory audio drivers/devices and MIDI routes. Use interface loopback or existing routes when available; loopMIDI/VB-CABLE are optional missing-route solutions.
 3. Send C4 and gesture chords into an FL instrument; verify channel, velocity and panic after disarm.
 4. Link one FL parameter to gesture CC and verify target feedback.
 5. Check native control bridge tempo, automation and stop/restart behavior.
-6. Once V50-08 exists, return wet AI audio on an FL insert, record a phrase and measure input-to-output timing without duplicate monitoring/feedback.
+6. Use the experimental 48 kHz Audio Bridge to return wet AI audio on an FL insert, record a phrase and measure input-to-output timing without duplicate monitoring/feedback.
 7. Save both configurations, restart both applications, and repeat a sustained performance.
 
 Design: [architecture](docs/ARCHITECTURE.md). Known limitations and remediation: [technical debt](docs/TECHNICAL_DEBT.md). Release history: [release notes](release-notes.md).

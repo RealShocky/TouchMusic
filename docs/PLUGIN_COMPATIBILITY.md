@@ -58,3 +58,20 @@ A two-effect SnapTune 2.4.0 -> TDR Nova 2.2.3 scheduled chain completed 72 paced
 TouchMusic Audio Bridge 0.5.0: 47 SDK validator checks passed. Actual Pedalboard hosting at 48 kHz sent/returned 90 stereo blocks with zero gaps/rejections; returned audio matched standalone DSP after the 4096-frame transport schedule. No real AI model, physical audio device or DAW was used. [Raw report](verification/native-audio-return.json).
 
 Surge XT 1.3.4 Windows x64: finite stereo chord rendering passed across 70 paced 512-frame blocks at 48 kHz, with zero worker errors/fallback. 2855 raw normalized parameters were exposed. Publisher-supported portable user data was used; a dedicated normalized adapter avoids expensive speculative text/range inference. No factory-content/preset library certification, listening, editor or DAW check is claimed. [Exact binary report](verification/surge-xt-1.3.4.json).
+
+## dev3 expanded verification
+
+| Plugin / version | Rates and blocks | Parameter automation | Native state / editor |
+| --- | --- | --- | --- |
+| TDR Nova 2.2.3 | 44.1/48/96 kHz x 128/512/1024 frames: 9/9 pass | Up to four exposed parameters swept across normalized range in each case | 4968-byte opaque state portable round trip passed; editor not tested |
+| SnapTune 2.4.0 | Same matrix: 6/9 pass; every 96 kHz case fails this host's valid full-block audio contract | Sweeps pass at tested 44.1/48 kHz | Actual editor API opened and event-closed in 0.844 s; no manual visual interaction claimed |
+| LyraTune 0.6.7 | Same matrix: 9/9 pass | Up to four exposed parameters swept in each case | Opaque restore/editor not independently certified |
+| Surge XT 1.3.4 | 48 kHz, 512 frames, 70 paced stereo chord blocks | 3047 normalized controls after preset initialization (2855 in the earlier dev2 pre-initialization snapshot) | See reviewed-archive probe below; factory content and editor usability remain unverified |
+
+Each matrix case uses a fresh owned process and 20 blocks after the primary 100-block scan. SnapTune's failure is a result of the current host/block contract, not a universal vendor incompatibility claim. All exact binaries, per-case timing and swept parameter names are in [matrix JSON](verification/effects-matrix-dev3.json). Normalized sweeps are compatibility probes, not tuning-quality listening tests.
+
+Native [Nova state report](verification/native-state-roundtrip.json) and [SnapTune editor API report](verification/native-editor-close.json) distinguish automated API checks from visual/manual/hardware/DAW checks. No physical audio or FL Studio test was performed. FL Studio checks are delegated to external testers.
+
+CI downloads checksum-pinned official SnapTune 2.4.0, LyraTune 0.6.7 and Surge XT 1.3.4 archives into temporary staging and saves JSON reports only. SnapTune/Lyra release pins match publisher GitHub asset digests. The Surge official archive hash is an observed integrity pin, not a publisher signature: `564e162c560af07ad4ed47fe1bfcd827cf97a575de30d06c48249aad2e7c35e6`. Third-party binaries are not published in TouchMusic artifacts.
+
+Reviewed-archive [Surge XT state/reset/render report](verification/curated-dev3/Surge-XT.json), [SnapTune scan](verification/curated-dev3/SnapTune.json) and [LyraTune scan](verification/curated-dev3/LyraTune.json). Instrument state preparation renders a bounded 32 silent blocks with audio stopped so deferred preset loads complete before notes are accepted.

@@ -66,7 +66,7 @@ def fingerprint(path):
     return digest.hexdigest()
 
 
-def scan_plugin(path, version='Unknown', factory=PluginProcess, blocks=100):
+def scan_plugin(path, version='Unknown', factory=PluginProcess, blocks=100, matrix=True):
     """A bounded smoke test, not certification or measured hardware round-trip latency."""
     record = {'path': str(Path(path).resolve()), 'version': version, 'status': 'Failed',
               'tested_at': datetime.now(timezone.utc).isoformat(), 'platform': platform.platform(),
@@ -117,7 +117,47 @@ def scan_plugin(path, version='Unknown', factory=PluginProcess, blocks=100):
     finally:
         if client:
             client.close()
+    if record['status'] == 'Passed smoke test' and matrix:
+        record['compatibility_cases'] = scan_matrix(path, factory)
     return record
+
+
+def scan_matrix(path, factory=PluginProcess, cases=None):
+    """Fresh native process per rate/block case; failure never contaminates later probes."""
+    cases = cases or [(rate, size) for rate in (44100, 48000, 96000) for size in (128, 512, 1024)]
+    deadline = time.monotonic()+45
+    results = []
+    for rate, size in cases:
+        result = {'rate': rate, 'block_frames': size, 'blocks': 20, 'passed': False}
+        client = None
+        try:
+            remaining = deadline-time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError('Compatibility matrix time budget reached.')
+            client = factory()
+            configured = client.request('configure', settings={'effects': [{'path': str(path)}]}, timeout=min(10, remaining))
+            names = list(configured['effects'][0].get('parameters', {}))[:4]
+            result['automation_sweep_parameters'] = names
+            costs = []
+            source = (np.random.default_rng(42).standard_normal(size)*.03).astype(np.float32)
+            for step in range(20):
+                remaining = deadline-time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError('Compatibility matrix time budget reached.')
+                started = time.perf_counter()
+                output = client.request('process', rate=rate, audio=encode_audio(source),
+                    parameters=[{name: step/19 for name in names}], timeout=min(10, remaining))
+                costs.append((time.perf_counter()-started)*1000)
+                if output.get('error') or decode_audio(output).shape != (2, size):
+                    raise ValueError(output.get('error') or 'Unexpected plugin channel/block layout.')
+            result.update(passed=True, rpc_ms_p95=float(np.percentile(costs, 95)))
+        except Exception as exc:
+            result['error'] = str(exc)
+        finally:
+            if client:
+                client.close()
+        results.append(result)
+    return results
 
 
 def save_scan(path, record):

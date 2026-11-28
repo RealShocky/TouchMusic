@@ -39,6 +39,11 @@ DOWNLOADS = {'TDR Nova': {
         'version': '0.6.7', 'filename': 'LyraTune-0.6.7-win-x64-vst3.zip',
         'url': 'https://github.com/333stack/LyraTune/releases/download/v0.6.7/LyraTune-0.6.7-win-x64-vst3.zip',
         'sha256': '4688b5e4174ffc98c3ba61d37abbfcd2cf6c4cf4f0e6eeef4ea9caa344702750',
+        'redirect_hosts': ['release-assets.githubusercontent.com']},
+    'Surge XT': {
+        'version': '1.3.4', 'filename': 'surge-xt-win64-1.3.4-pluginsonly.zip',
+        'url': 'https://github.com/surge-synthesizer/releases-xt/releases/download/1.3.4/surge-xt-win64-1.3.4-pluginsonly.zip',
+        'sha256': '564e162c560af07ad4ed47fe1bfcd827cf97a575de30d06c48249aad2e7c35e6',
         'redirect_hosts': ['release-assets.githubusercontent.com']}}
 
 

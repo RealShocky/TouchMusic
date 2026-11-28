@@ -49,7 +49,9 @@ class AudioBridge:
             return
         if self.engine.stream:
             raise ValueError('Stop standalone microphone audio before enabling DAW audio.')
-        if self.engine.rack.editor_open or self.engine.rack.editor_pending:
+        if any(rack.loading or rack.ui_busy for rack in (self.engine.rack, self.engine.instrument)):
+            raise ValueError('Wait for native loading or state capture to finish.')
+        if any(rack.editor_open or rack.editor_pending for rack in (self.engine.rack, self.engine.instrument)):
             raise ValueError('Close the native editor first.')
         channel = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
@@ -120,5 +122,6 @@ class AudioBridge:
                 return False
         self.socket, self.thread = None, None
         self.engine.external = False
+        self.engine.motion.stop()
         self.engine.instrument.panic()
         return True

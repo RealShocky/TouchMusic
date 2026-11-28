@@ -1,5 +1,6 @@
 """Motion Score recording, event editing and explicit automation playback."""
 import json
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                               QTableWidget, QTableWidgetItem, QFileDialog)
 from .motion_score import MotionScore
@@ -11,10 +12,15 @@ class MotionDialog(QDialog):
         self.owner = parent
         self.score = MotionScore()
         self.replaying = False
+        self.timer = QTimer(self)
+        self.timer.setInterval(10)
+        self.timer.timeout.connect(self.tick)
+        self.timer.start()
         layout = QVBoxLayout(self)
         hint = QLabel('Record movement targets and deliberate pose actions against the audio beat clock. '
                       'Playback can change effects, loops, voices and MIDI. Camera gestures are disarmed for replay. '
-                      'Timing uses the UI timer, not sample-accurate DAW automation. Recording replaces the current score.')
+                      'DSP and supported note/chord controls follow the audio sample clock. Voice, macro and external MIDI actions '
+                      'use a 10 ms GUI relay. Native parameter processing still follows worker block timing. Recording replaces the score.')
         hint.setWordWrap(True)
         layout.addWidget(hint)
         self.table = QTableWidget(0, 4)
@@ -48,10 +54,15 @@ class MotionDialog(QDialog):
             return
         if mode == 'Playing':
             self.owner.arm.setChecked(False)
+        if mode == 'Playing':
+            self.owner.engine.motion.start(self.score.settings(), self.routes())
+        else:
+            self.owner.engine.motion.stop()
         self.score.start(mode, self.owner.engine.clock.frame)
         self.status.setText(mode)
 
     def stop(self):
+        self.owner.engine.motion.stop()
         self.score.stop()
         self.owner.midi.panic()
         self.owner.engine.instrument.panic()
@@ -64,18 +75,101 @@ class MotionDialog(QDialog):
         if (not self.owner.engine.stream and not self.owner.engine.external):
             self.stop()
             return
-        clock = self.owner.engine.clock
-        due = self.score.advance(clock.frame, clock.period)
-        self.replaying = True
-        try:
-            for event in due:
-                if event['kind'] == 'level':
-                    self.owner.gesture_level(event['target'], event['value'])
+        if self.score.mode == 'Playing':
+            transport = self.owner.engine.motion
+            self.replaying = True
+            try:
+                for event, handled, frame in transport.drain():
+                    if handled:
+                        self.owner.gesture_preview.setText(f'Motion Score frame {frame}: '+event['target'])
+                    elif event['kind'] == 'level':
+                        self.owner.gesture_level(event['target'], event['value'])
+                    else:
+                        self.owner.gesture_action(event['target'], 'Motion Score')
+            finally:
+                self.replaying = False
+            self.score.beat = transport.beat
+            self.sync_controls()
+            if (transport.active_token == transport.token and not transport.running
+                    and transport.pending is None and transport.messages.empty()):
+                self.score.stop()
+            self.status.setText(transport.error or f'{self.score.mode} | beat {self.score.beat:.3f} | audio-clock scheduling')
+        else:
+            clock = self.owner.engine.clock
+            self.score.advance(clock.frame, clock.period)
+            self.status.setText(f'Recording | beat {self.score.beat:.3f} | {len(self.score.events)} events')
+
+    def sync_controls(self):
+        params = self.owner.engine.params.copy()
+        for key, slider in self.owner.sliders.items():
+            if key not in params:
+                continue
+            divisor = 1000 if key == 'delaytime' else 1 if key in ('pitch', 'formant') else 100
+            value = round(params[key]*divisor)
+            slider.blockSignals(True)
+            slider.setValue(value)
+            slider.blockSignals(False)
+            label = self.owner.value_labels.get(key)
+            if label is not None:
+                label.setText(f'{value} ms' if key == 'delaytime' else f'{value:+d} st'
+                              if key in ('pitch', 'formant') else f'{value}%')
+        for index, loop in enumerate(self.owner.engine.loops):
+            slider = self.owner.pad_levels[index]
+            slider.blockSignals(True)
+            slider.setValue(round(loop.gain*100))
+            slider.blockSignals(False)
+        from PySide6.QtWidgets import QComboBox, QCheckBox
+        for key, control in self.owner.music_controls.items():
+            if key not in params:
+                continue
+            value = params[key]
+            control.blockSignals(True)
+            if isinstance(control, QCheckBox):
+                control.setChecked(bool(value))
+            elif isinstance(control, QComboBox):
+                if key in ('key', 'chord'):
+                    control.setCurrentIndex(int(value))
+                elif key == 'capture_bars':
+                    control.setCurrentIndex(control.findData(value))
                 else:
-                    self.owner.gesture_action(event['target'], 'Motion Score')
-        finally:
-            self.replaying = False
-        self.status.setText(f'{self.score.mode} | beat {self.score.beat:.2f} | {len(self.score.events)} events')
+                    control.setCurrentText(str(value))
+            else:
+                control.setValue(round(value*100 if key == 'overdub_feedback' else value))
+            control.blockSignals(False)
+        for slider, gain in ((self.owner.track_volume, self.owner.engine.track.gain),
+                             (self.owner.instrument_dialog.level, self.owner.engine.instrument.gain)):
+            slider.blockSignals(True)
+            slider.setValue(round(gain*100))
+            slider.blockSignals(False)
+        tune = round(params['tune']*100)
+        self.owner.tune_button.blockSignals(True)
+        self.owner.tune_button.setChecked(bool(tune))
+        self.owner.tune_button.setText('Auto-Tune On' if tune else 'Auto-Tune Off')
+        self.owner.tune_button.blockSignals(False)
+        if tune:
+            self.owner.last_tune = tune
+
+    def routes(self):
+        from .ui import EFFECT_TARGETS, TARGET_KEYS, MUSIC_TARGETS, INSTRUMENT_NOTES
+        from PySide6.QtWidgets import QComboBox
+        routes = {'_notes': INSTRUMENT_NOTES, '_velocity': self.owner.midi_dialog.velocity.value(),
+                  '_length': self.owner.midi_dialog.length.value()/1000}
+        for target in EFFECT_TARGETS:
+            key = TARGET_KEYS.get(target, target.lower())
+            slider = self.owner.sliders.get(key)
+            if slider is not None:
+                routes[target] = {'key': key, 'minimum': slider.minimum(), 'maximum': slider.maximum(),
+                                  'divisor': 1000 if key == 'delaytime' else 1 if key in ('pitch', 'formant') else 100}
+            elif target in MUSIC_TARGETS:
+                key = MUSIC_TARGETS[target]
+                control = self.owner.music_controls[key]
+                if isinstance(control, QComboBox):
+                    choices = [control.itemData(i) if key == 'capture_bars' else i for i in range(control.count())]
+                    routes[target] = {'key': key, 'choices': choices}
+                else:
+                    routes[target] = {'key': key, 'minimum': control.minimum(), 'maximum': control.maximum(),
+                                      'divisor': 100 if key == 'overdub_feedback' else 1}
+        return routes
 
     def capture(self, kind, target, value=None):
         if not self.replaying and self.score.mode == 'Recording':
@@ -91,6 +185,7 @@ class MotionDialog(QDialog):
                         *[SCENE_PREFIX+name for name in self.owner.saved_presets]]
             if event['target'] not in allowed:
                 raise ValueError('Unknown Motion Score target: '+event['target'])
+        self.owner.engine.motion.stop()
         self.score.load(settings)
         self.refresh()
 

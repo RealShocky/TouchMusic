@@ -2,7 +2,7 @@ from io import BytesIO
 import hashlib
 import numpy as np
 import pytest
-from touchmusic.plugin_scan import discover, scan_plugin
+from touchmusic.plugin_scan import discover, scan_plugin, scan_matrix
 from touchmusic.plugin_catalog import download_plugin, DOWNLOADS
 from touchmusic.gesture_learn import GestureLearner
 
@@ -68,3 +68,28 @@ def test_learn_requires_deliberate_unambiguous_movement_and_times_out():
     assert learner.feed([{**control, 'y': .8}]) == 'Right'
     now[0] = 11
     assert learner.feed([control]) == 'timeout'
+
+
+def test_matrix_cases_use_fresh_workers_and_do_not_hide_an_unsupported_rate():
+    from touchmusic.plugin_worker import encode_audio, decode_audio
+    clients = []
+    class Probe:
+        closed = False
+        def request(self, action, **values):
+            if action == 'configure':
+                return {'effects': [{'parameters': {'gain': .5}}]}
+            if values['rate'] == 96000:
+                raise RuntimeError('unsupported test rate')
+            source = decode_audio(values['audio'])
+            assert 0 <= values['parameters'][0]['gain'] <= 1
+            return {**encode_audio(np.stack((source, source))), 'error': ''}
+        def close(self):
+            self.closed = True
+    def factory():
+        client = Probe()
+        clients.append(client)
+        return client
+    results = scan_matrix('example.vst3', factory, cases=[(96000, 128), (44100, 512)])
+    assert not results[0]['passed'] and 'unsupported' in results[0]['error']
+    assert results[1]['passed'] and results[1]['automation_sweep_parameters'] == ['gain']
+    assert len(clients) == 2 and all(client.closed for client in clients)

@@ -1,6 +1,6 @@
 # TouchMusic architecture
 
-Development snapshot: 0.5.0.dev2. Requirements and delivery status live only in [roadmap.md](../roadmap.md).
+Development snapshot: 0.5.0.dev3. Requirements and delivery status live only in [roadmap.md](../roadmap.md).
 
 ## Runtime boundaries
 
@@ -41,17 +41,17 @@ RPC is bounded UTF-8 JSON lines, at most 2 MiB per message. PCM is finite float3
 
 Configuration is transactional: a candidate process must load the complete requested rack before replacing the current one. A failed load retains the previous process and cached descriptors. Native calls have an owned-process kill watchdog. Native editor calls intentionally remain open until the user closes the window or the application kills its child on shutdown.
 
-Structural operations occur with audio stopped. Stream reset drains the previous broker generation, resets native audio buffers, then starts a fresh bounded pipeline without discarding the native editor's current runtime state. Explicit Restart reloads the normalized saved configuration. No automatic crash/restart loop repeatedly loads a faulty binary.
+Structural operations occur with audio stopped. Stream reset drains the previous broker generation, resets native audio buffers, then starts a fresh bounded pipeline without discarding the native editor's current runtime state. Explicit Restart reloads captured native state plus normalized controls. No automatic crash/restart loop repeatedly loads a faulty binary.
 
-At shutdown TouchMusic stops scanning, kills owned native children and closes its audio/conversion resources. Other applications and unrelated processes are never terminated.
+At shutdown TouchMusic stops scanning/audio, requests native editors close, captures available stopped-worker state, cancels candidate loads and closes owned children/conversion resources. A worker reader detects parent EOF and exits even while a native editor is open. Other applications and unrelated processes are never terminated.
 
 ## Plugin Center and compatibility
 
 Discovery enumerates paths, treating a `.vst3` directory as one bundle. It does not instantiate plugins. Explicit scans use a separate worker and produce binary-hash/version/rate/block/parameter/impulse/RPC evidence. A failure quarantines that Plugin Center entry until a successful rescan. The direct FX file picker remains an explicit advanced loading path.
 
-The catalog separates official publisher identity, license label, reviewed download asset and measured compatibility. Pinned downloads are TDR Nova 2.2.3, SnapTune 2.4.0 and LyraTune 0.6.7. It is staged as an archive and never automatically executed/extracted. The SHA-256 is an observed integrity pin, not a publisher signature. Community catalogs are reference material only.
+The catalog separates official publisher identity, license label, reviewed download asset and measured compatibility. Pinned downloads are TDR Nova 2.2.3, SnapTune 2.4.0, LyraTune 0.6.7 and Surge XT 1.3.4. It is staged as an archive and never automatically executed/extracted. The SHA-256 is an observed integrity pin, not a publisher signature. Community catalogs are reference material only.
 
-Native editors use the actual loaded plugin instance on the worker's main thread. The GUI remains available; audio start and rack changes are blocked until the editor closes. Exposed parameters synchronize afterward. Full opaque state persistence across restarts/projects is not implemented yet.
+Native editors use the actual loaded plugin instance on the worker's main thread. The GUI remains available; audio start and rack changes are blocked until the editor closes. Exposed parameters synchronize afterward. Opaque state captures in bounded chunks and persists in the content-addressed StateStore and optional project ZIP entries. Structural tasks run off the GUI thread; a lifecycle epoch prevents a candidate load committing after shutdown.
 
 ## Gesture Learn and Motion Score
 
@@ -59,7 +59,7 @@ Gesture Learn temporarily disarms performance output. It establishes axis baseli
 
 Motion Score v1 stores at most 4096 finite beat-ordered events. Targets are validated against supported movement/action names. Recording captures filtered movement values and deliberate physical pose actions, so a macro is recorded once rather than duplicated with every expanded action. Playback calls the existing gesture dispatchers and never starts merely because a project was opened. Rehearsal and learning remain separate modes.
 
-Current playback is serviced by the 100 ms UI timer. It follows elapsed audio frames with the current beat period and is not sample-accurate host automation. Editing, row deletion, explicit JSON import/export and saved-performance persistence exist; envelope editing and deterministic scheduling are next-stage work.
+MotionTransport splits local rendering at event sample boundaries, tracks beats as tempo changes and limits event work to 128 events per processing call. Local DSP/loop/chord/note commands run there. A bounded 1024-item relay, drained by a 10 ms Qt timer, carries voice/macros/external MIDI and UI feedback. Tokens invalidate stopped scores. Plugin knobs still apply at worker boundaries; this is not sample-accurate DAW automation. Envelope editing and host-seek semantics remain open.
 
 ## DAW and instrument boundaries
 
@@ -67,7 +67,7 @@ The existing VST3 Control Bridge remains version 0.4.0 and retains its protocol/
 
 ## Compatibility contract
 
-Existing v1 performance archives, normalized FX settings and gesture mappings remain readable. New Motion Score data is optional and never auto-plays. A saved external rack still requires explicit review/load. Preserving old mono loop assets avoids an untested schema change. Unknown/malformed automation is rejected before replacing a score. Future stereo assets, plugin blobs and audio bridge state require versioned, tested migrations.
+Existing v1 performance archives, normalized FX settings and gesture mappings remain readable. New Motion Score data is optional and never auto-plays. A saved external rack still requires explicit review/load. Preserving old mono loop assets avoids an untested schema change. Unknown/malformed automation is rejected before replacing a score. Optional plugin-state inventories extend v1 without changing legacy assets. New readers accept old archives; older readers can retain normalized fallback but cannot restore opaque snapshots. Future stereo assets and bridge state require checked migrations.
 
 ## dev2: separate synth and DAW audio buses
 
@@ -75,4 +75,14 @@ InstrumentBus reuses the owned-process pipeline with a separate InstrumentBacken
 
 The new Audio Bridge uses a distinct VST3 UID. Its audio callback only copies samples and exchanges bounded SPSC queues. A native network thread owns UDP; the Python receiver is loopback-only and processes one source at 48 kHz without a simultaneous PortAudio stream. Packet identity, source frame, shape, rate, kind and finite PCM are checked; duplicate/foreign packets are rejected. The DAW owns the input clock, eliminating a second device clock for this route. Missing returns use the matching delayed dry block.
 
-The native plugin reports 4096 transport frames. This is not total AI/FX latency compensation: converter and effect-worker delays still apply, and parameter automation is not sample-accurate across the process boundary. Offline fast rendering and non-48-kHz wet return are explicitly unsupported. Actual native-host DSP return was checked; FL Studio and real-model conversion inside a DAW remain pending.
+The native plugin reports 4096 transport frames. This is not total AI/FX latency compensation: converter and effect-worker delays still apply, and parameter automation is not sample-accurate across the process boundary. Offline fast rendering and non-48-kHz wet return are explicitly unsupported. Actual native-host DSP return was checked; Real GPU conversion through the actual native host has also passed, with measured converter underruns. Physical FL Studio and conversion inside a DAW remain delegated and unverified.
+
+## State and session ownership
+
+Native state is limited to 8 MiB per blob and 32 MiB per project, transferred in 64 KiB chunks through the owned worker. SHA-256 addresses identify blobs; restores also require the captured plugin-binary hash. A candidate is fully configured before an atomic commit replaces the old worker. Native preset restoration precedes normalized overlay and binding validation. Missing/tampered state aborts the transaction; the old rack remains. Pedalboard's native raw_state descriptor is set directly, avoiding speculative parameter-name inference on large synths.
+
+Native-load tasks return plain results to GUI polling; Qt widgets stay on the GUI thread. Closing increments the lifecycle epoch and terminates only owned candidates. Native editor close controls are read separately from the blocking editor RPC, while all DLL work stays on the worker main thread.
+
+SingleInstance uses a per-data-directory QLockFile. A local Qt server focuses the owner; if named pipes are restricted, a bounded atomic request marker provides focus handoff. Independent data directories remain independent installations. Device monitoring stops an inactive stream and requires explicit refresh/reselection; it does not reopen another microphone automatically.
+
+Instrument initialization, opaque restore, editor close and stream reset prepare 32 paced silent 512-frame blocks in the owned worker, off the GUI/audio callback. This allows deferred vendor preset loads to settle before accepting notes. The native parameter snapshot is replaced after initialization/restoration so removed or newly exposed parameters are reflected. This finite window is tested for Surge XT 1.3.4, not a guarantee for every synth.

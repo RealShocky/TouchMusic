@@ -21,16 +21,22 @@ def main():
     sys.stderr = log
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer
-    from .ui import MainWindow
     app = QApplication(sys.argv)
     app.setApplicationName('TouchMusic')
+    from .instance import SingleInstance
+    instance = SingleInstance(DATA, app)
+    if not instance.acquire():
+        return
+    app.aboutToQuit.connect(instance.close)
     try:
+        from .ui import MainWindow
         window = MainWindow()
     except Exception:
         traceback.print_exc()
         from PySide6.QtWidgets import QMessageBox
         QMessageBox.critical(None, 'TouchMusic could not start', f'See {DATA / "touchmusic.log"} for details.')
         raise
+    instance.set_window(window)
     window.show()
     print('TouchMusic window initialized', flush=True)
     if args.load_engine:

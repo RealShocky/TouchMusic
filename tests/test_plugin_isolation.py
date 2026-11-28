@@ -51,6 +51,19 @@ def test_rpc_watchdog_kills_a_stuck_owned_worker():
         client.close()
 
 
+def test_worker_exits_when_parent_pipe_closes_and_close_control_has_no_reply_frame():
+    client = PluginProcess()
+    try:
+        client.request('ping')
+        client.process.stdin.write(b'{"action":"close_editor"}\n')
+        client.process.stdin.flush()
+        assert client.request('ping')['pid'] != os.getpid()
+        client.process.stdin.close()
+        assert client.process.wait(timeout=3) == 0
+    finally:
+        client.close()
+
+
 def test_dry_fallback_is_exactly_delayed_for_variable_blocks_and_bounded():
     rack = IsolatedPluginRack()
     rack.slots = [{'parameters': {}, 'bypass': False}]

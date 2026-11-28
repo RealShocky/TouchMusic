@@ -1,0 +1,14 @@
+{
+  "native_audio_bridge": "0.5.0",
+  "rate": 48000,
+  "blocks_sent": 90,
+  "returned_blocks": 90,
+  "gaps": 0,
+  "rejected": 0,
+  "server_error": "",
+  "declared_transport_frames": 4096,
+  "matches_standalone_processed_audio": true,
+  "hardware_tested": false,
+  "daw_tested": false,
+  "real_ai_model_tested": false
+}

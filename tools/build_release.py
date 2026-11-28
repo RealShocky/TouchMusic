@@ -18,8 +18,10 @@ def main():
     source_files.extend(path for path in (ROOT / 'native/control_bridge').glob('*') if path.is_file())
     source_files.extend((ROOT/'docs'/name) for name in ('ARCHITECTURE.md', 'TECHNICAL_DEBT.md',
                         'PLUGIN_COMPATIBILITY.md', 'BENCHMARKS.md'))
-    source_files.extend((ROOT/'docs/verification').glob('*.json'))
-    source_files.extend((ROOT/'tools'/name) for name in ('benchmark_audio.py', 'release_version.py'))
+    source_files.extend((ROOT/'docs/verification').rglob('*.json'))
+    source_files.extend((ROOT/'tools'/name) for name in ('benchmark_audio.py', 'benchmark_ai.py',
+                        'verify_performance.py', 'verify_plugins.py', 'verify_audio_bridge.py',
+                        'verify_native_bridge.py', 'release_version.py'))
     archive = OUTPUT / f'TouchMusic-{VERSION}-Windows-Setup.zip'
     with ZipFile(archive, 'w', ZIP_DEFLATED) as zipped:
         for file in sorted(source_files):

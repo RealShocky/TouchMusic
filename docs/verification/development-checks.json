@@ -1,16 +1,16 @@
 {
-  "snapshot": "0.5.0.dev2",
+  "snapshot": "0.5.0.dev3",
   "python_tests": {
-    "passed": 121,
+    "passed": 135,
     "failed": 0,
-    "scope": "Automated behavior and offscreen Qt"
+    "scope": "Automated behavior, injected device failures and offscreen Qt"
   },
   "native_sdk": {
     "passed": 47,
     "failed": 0,
     "bridge_version": "0.4.0",
     "rebuilt": false,
-    "note": "Existing compiled unchanged bridge revalidated"
+    "note": "Compiled unchanged control bridge revalidated locally; CI rebuilds both bridges"
   },
   "native_host_control_probe": "Passed real Pedalboard hosting, passthrough and localhost UDP automation",
   "packaging": {
@@ -24,14 +24,9 @@
   },
   "physical_microphone_speaker_camera_tested": false,
   "daw_tested": false,
-  "vendor_native_editor_tested": false,
+  "vendor_native_editor_tested": "SnapTune 2.4.0 actual API open/event-close; manual visual interaction not tested",
   "full_v050_goal_complete": false,
-  "tested_at_utc": "2026-11-28T12:30:34.526938+00:00",
-  "initial_ci": {
-    "commit": "e0a2fec4095aff2ee33af7906b5138253a57d058",
-    "run": "https://github.com/RealShocky/TouchMusic/actions/runs/46136570127",
-    "result": "Passed test, native rebuild and package jobs; PyPI publication correctly skipped for development version"
-  },
+  "tested_at_utc": "2026-11-28T14:20:46.695935+00:00",
   "plugins_smoke_tested": [
     "TDR Nova 2.2.3",
     "SnapTune 2.4.0",
@@ -41,6 +36,15 @@
     "passed": 47,
     "failed": 0
   },
-  "native_audio_return": "90 blocks match standalone DSP; no real model or hardware",
-  "vendor_instrument_compatibility": "Surge XT 1.3.4 stereo chord render: 70 blocks, no worker errors/fallback, no hardware/DAW check"
+  "native_audio_return": "90 blocks match standalone DSP; also 750 packets of real GPU conversion, 619 matched converted blocks, 122 converter underruns",
+  "vendor_instrument_compatibility": "Surge XT 1.3.4 opaque state restore, stream reset and 70-block stereo chord render pass; no hardware/DAW",
+  "daw_testing": "Delegated to external testers at user request; no FL Studio testing performed",
+  "state_and_lifecycle": "Portable/checksum/binary/limits/cancellation tests plus ten Nova worker/state cycles; zero remaining owned workers",
+  "endurance": "3600 simulated seconds in 120.324 wall seconds, finite bounded DSP, zero synthetic deadline misses; not hardware soak",
+  "real_gpu_tested": true,
+  "ci_history": {
+    "commit": "e0a2fec4095aff2ee33af7906b5138253a57d058",
+    "run": "https://github.com/RealShocky/TouchMusic/actions/runs/46136570127",
+    "result": "Passed test, native rebuild and package jobs; PyPI publication correctly skipped for development version"
+  }
 }

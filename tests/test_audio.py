@@ -25,3 +25,21 @@ def test_recording_flushes_all_samples(tmp_path):
     assert len(audio) == 5120 and rate == RATE
     assert np.allclose(audio, .2, atol=1e-6)
     assert not recorder.error
+
+
+def test_lost_device_is_closed_even_when_stop_raises_and_does_not_reopen():
+    engine = AudioEngine()
+    class Disconnected:
+        active = False
+        closed = False
+        def stop(self):
+            raise RuntimeError('device removed')
+        def close(self):
+            self.closed = True
+    stream = Disconnected()
+    engine.stream = stream
+    engine.loop.toggle()
+    message = engine.monitor_stream()
+    assert 'disconnected' in message
+    assert stream.closed and engine.stream is None and not engine.loop.recording
+    assert engine.monitor_stream() is None

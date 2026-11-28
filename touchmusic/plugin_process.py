@@ -19,6 +19,8 @@ class PluginProcess:
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             env=env, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         self.lock = threading.Lock()
+        self.editor_active = False
+        self.editor_closing = False
 
     def request(self, action, timeout=10, **values):
         payload = json.dumps({'action': action, **values}, allow_nan=False,
@@ -35,6 +37,10 @@ class PluginProcess:
             try:
                 self.process.stdin.write(payload)
                 self.process.stdin.flush()
+                if action == 'editor':
+                    self.editor_active = True
+                    if self.editor_closing:
+                        self.close_editor()
                 line = self.process.stdout.readline(MAX_MESSAGE + 1)
                 if not line or len(line) > MAX_MESSAGE or not line.endswith(b'\n'):
                     self.kill()
@@ -47,8 +53,20 @@ class PluginProcess:
                 self.kill()
                 raise RuntimeError('Plugin communication failed: ' + str(exc)) from exc
             finally:
+                if action == 'editor':
+                    self.editor_active = False
+                    self.editor_closing = False
                 if watchdog:
                     watchdog.cancel()
+
+    def close_editor(self):
+        self.editor_closing = True
+        if self.editor_active and self.process.poll() is None:
+            try:
+                self.process.stdin.write(b'{"action":"close_editor"}\n')
+                self.process.stdin.flush()
+            except OSError:
+                pass
 
     def kill(self):
         if self.process.poll() is None:

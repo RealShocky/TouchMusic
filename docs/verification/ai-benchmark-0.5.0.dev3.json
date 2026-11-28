@@ -1,0 +1,32 @@
+{
+  "label": "0.5.0.dev3",
+  "backend_sha256": "bd6396a2b172ff624d5254bc3324b043763f290b38720e56158e5c62834ad025",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 5060",
+  "torch": "2.11.0+cu128",
+  "model_load_seconds": 15.511978299939074,
+  "source_seconds": 2.0,
+  "conversion_seconds": [
+    0.6046605000738055,
+    0.3745312000392005
+  ],
+  "conversion_cpu_seconds": 2.109375,
+  "peak_process_memory_bytes": 3598479360,
+  "real_model_tested": true,
+  "gpu_peak_allocated_bytes": 2057714688,
+  "gpu_peak_reserved_bytes": 2296381440,
+  "physical_audio_devices_tested": false,
+  "listening_quality_tested": false,
+  "fixture_note": "The same two local references are used for both runs; no audio or reference identity is exported.",
+  "real_model_native_return": {
+    "packets": 750,
+    "input_packet_gaps": 0,
+    "converter_dropped_chunks": 0,
+    "converter_underruns": 122,
+    "last_inference_ms": 409.28969997912645,
+    "finite_nonzero_stereo": true,
+    "matched_real_converted_blocks": 619,
+    "daw_tested": false,
+    "note": "Actual native hosting with GPU conversion; no physical microphone or DAW."
+  }
+}

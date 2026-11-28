@@ -16,3 +16,4 @@ prune dist
 prune build
 
 include tools/verify_audio_bridge.py
+include tools/benchmark_ai.py tools/verify_performance.py tools/verify_plugins.py

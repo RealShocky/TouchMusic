@@ -2,6 +2,7 @@
 from pathlib import Path
 import math
 import re
+import time
 import numpy as np
 from .plugin_rack import PluginRack
 
@@ -43,6 +44,17 @@ class InstrumentBackend(PluginRack):
         self.slots = [{**item, 'path': str(path), 'plugin_name': item.get('plugin_name', ''),
                        'parameters': values, 'bypass': bool(item.get('bypass')), 'plugin': plugin}]
         self.bindings = settings.get('bindings', {}).copy()
+
+    def prepare_state(self):
+        """Let deferred vendor preset loads finish before accepting live notes.
+
+        Runs only in the owned worker with audio stopped, under the RPC watchdog.
+        Some synths consume their first notes while applying queued native state.
+        This bounded silent preparation also applies after stream resets.
+        """
+        for _ in range(32):
+            self.process(512, 48000, [])
+            time.sleep(512/48000)
 
     def process(self, frames, rate, midi):
         if not isinstance(midi, list) or len(midi) > 512 or rate != 48000:

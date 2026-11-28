@@ -156,6 +156,9 @@ class PluginRack:
                     or not isinstance(item.get('plugin_name', ''), str)
                     or not isinstance(item.get('parameters', {}), dict)):
                 raise ValueError('Invalid saved effect.')
+            from .plugin_state import valid_id
+            if ('state_id' in item and not valid_id(item['state_id'])) or ('state_binary' in item and not valid_id(item['state_binary'])):
+                raise ValueError('Invalid saved native state identity.')
             values = item.get('parameters', {})
             if len(values) > maximum_parameters or any(not isinstance(name, str) or type(value) not in (int, float)
                     or not math.isfinite(value) or not 0 <= value <= 1 for name, value in values.items()):

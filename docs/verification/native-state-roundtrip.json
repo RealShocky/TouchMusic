@@ -1,0 +1,9 @@
+{
+  "plugin": "TDR Nova",
+  "version": "2.2.3",
+  "opaque_state_bytes": 4968,
+  "portable_restore": "Passed",
+  "normalized_overlay": "Passed",
+  "hardware_tested": false,
+  "daw_tested": false
+}

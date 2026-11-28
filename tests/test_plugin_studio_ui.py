@@ -1,4 +1,6 @@
 import time
+import threading
+import pytest
 import numpy as np
 from touchmusic import ui
 from touchmusic.library import VoiceLibrary
@@ -77,6 +79,7 @@ def test_native_editor_broker_updates_parameters_and_clears_busy_flag():
             return {'effects': [{'path': 'test.vst3', 'parameters': {'gain': .7}}]}
     rack = IsolatedPluginRack()
     rack.client = EditorClient()
+    rack.capture_states = lambda: None
     rack.show_editor(0)
     assert not rack.editor_open
     assert rack.slots[0]['parameters']['gain'] == .7
@@ -99,3 +102,45 @@ def test_timed_wet_results_preserve_stereo_and_never_shift_later_blocks():
     first['wet'] = np.stack((source*99, source*99))
     dry = rack.process(source*4, 48000, stereo=True)
     np.testing.assert_array_equal(dry, 2)
+
+
+def test_background_loading_keeps_gui_alive_and_blocks_audio_start(tmp_path, monkeypatch, qt_application):
+    monkeypatch.setattr(ui, 'DATA', tmp_path)
+    monkeypatch.setattr(ui, 'VoiceLibrary', lambda: VoiceLibrary(tmp_path/'voices'))
+    window = ui.MainWindow()
+    release = threading.Event()
+    def slow_load(*args):
+        release.wait(2)
+        window.engine.rack.slots = [{'path': 'async.vst3', 'plugin_name': '', 'parameters': {'gain': .5}, 'bypass': False}]
+    monkeypatch.setattr(window.engine.rack, 'add', slow_load)
+    try:
+        window.plugin_dialog.add('async.vst3')
+        assert window.plugin_dialog.task and window.engine.rack.ui_busy
+        window.workspaces.open('Motion Score')
+        qt_application.processEvents()
+        assert window.workspaces.navigation.currentItem().text() == 'Motion Score'
+        with pytest.raises(ValueError, match='native plugin loading'):
+            window.engine.start(None, None)
+        release.set()
+        window.plugin_dialog.task.thread.join(2)
+        window.plugin_dialog.poll()
+        assert not window.engine.rack.ui_busy and window.plugin_dialog.effects.count() == 1
+    finally:
+        release.set()
+        window.close()
+
+
+def test_motion_feedback_updates_controls_without_reissuing_audio_commands(tmp_path, monkeypatch):
+    monkeypatch.setattr(ui, 'DATA', tmp_path)
+    monkeypatch.setattr(ui, 'VoiceLibrary', lambda: VoiceLibrary(tmp_path/'voices'))
+    window = ui.MainWindow()
+    try:
+        window.engine.params.update(master=.37, bpm=180, chord=4)
+        window.motion_dialog.sync_controls()
+        assert window.sliders['master'].value() == 37
+        assert window.music_controls['bpm'].value() == 180
+        assert window.music_controls['chord'].currentIndex() == 4
+        assert window.engine.commands.empty() and not window.engine.clock.pending
+        assert all(isinstance(i, int) for i in window.motion_dialog.routes()['Capture length']['choices'])
+    finally:
+        window.close()

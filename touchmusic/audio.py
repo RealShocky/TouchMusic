@@ -12,6 +12,7 @@ from .vocal import FormantShifter, VocalAnalysis, harmony_shift
 from .alignment import align_recording, mix_stems
 from .isolated_rack import IsolatedPluginRack
 from .instrument import InstrumentBus
+from .motion_transport import MotionTransport
 
 RATE = 48000
 BLOCK = 512
@@ -350,6 +351,7 @@ class AudioEngine:
         self.test_tone = SamplePlayer()
         self.rack = IsolatedPluginRack()
         self.instrument = InstrumentBus()
+        self.motion = MotionTransport()
         self.external = False
         self.rack_origins = np.full(self.rack.latency_frames, -1, np.int64)
         self.loops = [LoopTrack(RATE) for _ in range(LOOP_COUNT)]
@@ -513,18 +515,28 @@ class AudioEngine:
         end = clock.frame + len(audio)
         offset = 0
         blocks = []
-        while clock.pending:
-            key, (frame, command) = min(clock.pending.items(), key=lambda item: item[1][0])
-            if frame >= end:
-                break
-            size = max(0, frame - clock.frame)
+        self.motion.begin()
+        while clock.frame < end:
+            score_frame = self.motion.next_frame(clock.frame, clock.period)
+            command = min(clock.pending.items(), key=lambda item: item[1][0]) if clock.pending else None
+            command_frame = command[1][0] if command else None
+            boundary = min([end, *([score_frame] if score_frame is not None else []),
+                            *([max(clock.frame, command_frame)] if command_frame is not None else [])])
+            size = boundary-clock.frame
             if size:
                 blocks.append(self._render(audio[offset:offset+size]))
+                self.motion.advance(size, clock.period)
                 clock.frame += size
                 offset += size
-            clock.discard(key)
-            self._apply_command(*command)
-        blocks.append(self._render(audio[offset:]))
+            if boundary == end:
+                break
+            if score_frame is not None and score_frame <= clock.frame:
+                self.motion.dispatch(self)
+                clock.set_tempo(self.params['bpm'], self.params['quantize'])
+            elif command and command_frame <= clock.frame:
+                key, (_, queued) = command
+                clock.discard(key)
+                self._apply_command(*queued)
         clock.frame = end
         result = blocks[0] if len(blocks) == 1 else np.concatenate(blocks)
         return result if stereo else result.mean(axis=1)
@@ -655,9 +667,11 @@ class AudioEngine:
             self.max_callback_ms = max(self.max_callback_ms, self.callback_ms)
 
     def start(self, input_device, output_device):
+        if any(rack.loading or rack.ui_busy for rack in (self.rack, self.instrument)):
+            raise ValueError('Wait for native plugin loading or state capture to finish.')
         if self.external:
             raise ValueError('Stop the DAW audio receiver before starting microphone audio.')
-        if self.rack.editor_open or self.rack.editor_pending:
+        if any(rack.editor_open or rack.editor_pending for rack in (self.rack, self.instrument)):
             raise ValueError('Close the native plugin editor before starting audio.')
         input_info = sd.query_devices(input_device, 'input')
         output_info = sd.query_devices(output_device, 'output')
@@ -701,12 +715,20 @@ class AudioEngine:
         self.stream = stream
 
     def stop(self):
+        self.motion.stop()
         self.instrument.panic()
         self.test_tone.load([])
         if self.stream:
-            self.stream.stop()
-            self.stream.close()
-            self.stream = None
+            stream, self.stream = self.stream, None
+            try:
+                stream.stop()
+            except Exception as exc:
+                self.error = 'Audio stop failed: '+str(exc)
+            finally:
+                try:
+                    stream.close()
+                except Exception as exc:
+                    self.error = 'Audio device close failed: '+str(exc)
             for track in self.loops:
                 if track.recording:
                     track.toggle()
@@ -715,6 +737,22 @@ class AudioEngine:
             self.clock.pending.clear()
             self.clock.beat_targets.clear()
         return self.stop_recording()
+
+    def monitor_stream(self):
+        if self.stream is None:
+            return None
+        try:
+            active = self.stream.active
+        except AttributeError:
+            return None
+        except Exception:
+            active = False
+        if active:
+            return None
+        message = 'Audio device stopped or disconnected. Reconnect it, refresh devices and select the intended route.'
+        self.stop()
+        self.error = message
+        return message
 
     def start_recording(self, path, stems=False, align=False):
         if not self.stream and not self.external:

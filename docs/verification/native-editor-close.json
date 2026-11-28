@@ -1,0 +1,8 @@
+{
+  "plugin": "SnapTune",
+  "version": "2.4.0",
+  "native_editor_api": "Opened and closed through worker event control",
+  "elapsed_seconds": 0.8440000000409782,
+  "manual_visual_inspection": false,
+  "hardware_audio_tested": false
+}

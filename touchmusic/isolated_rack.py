@@ -3,10 +3,13 @@ from copy import deepcopy
 import math
 import queue
 import threading
+import base64
 import numpy as np
 from .plugin_process import PluginProcess
 from .plugin_rack import PluginRack
 from .plugin_worker import encode_audio, decode_audio
+from .plugin_state import StateStore, CHUNK
+from .plugin_scan import fingerprint
 
 
 class IsolatedPluginRack:
@@ -14,8 +17,15 @@ class IsolatedPluginRack:
     quantum = 512
     latency_frames = 2048
 
-    def __init__(self, factory=PluginProcess):
+    def __init__(self, factory=PluginProcess, state_store=None):
+        self._commit_lock = threading.Lock()
+        self._restore_lock = threading.Lock()
+        self._lifecycle_epoch = 0
+        self.preparing = None
+        self.loading = False
+        self.ui_busy = False
         self.factory = factory
+        self.state_store = state_store or StateStore()
         self.slots, self.bindings = [], {}
         self.error = ''
         self.bypassed_blocks = 0
@@ -37,33 +47,84 @@ class IsolatedPluginRack:
 
     def restore(self, settings):
         self.validate(settings)
-        if self.editor_open:
+        if self.editor_open or self.editor_pending:
             raise RuntimeError('Close the native editor first.')
-        prepared = self.factory() if settings.get('effects') else None
+        if not self._restore_lock.acquire(blocking=False):
+            raise RuntimeError('A plugin configuration is already in progress.')
+        self.loading = True
+        epoch = self._lifecycle_epoch
+        prepared = None
+        committed = False
         try:
-            values = prepared.request('configure', settings=settings) if prepared else settings
-        except Exception:
-            prepared.close()
-            raise
-        self.close()
-        self.client = prepared
-        self.slots = deepcopy(values.get('effects', []))
-        self.bindings = deepcopy(values.get('bindings', {}))
-        self.error = ''
-        self.reset_pipeline()
-        if prepared:
-            jobs, generation = self.jobs, self.generation
-            initial = [dict(s['parameters']) for s in values['effects']]
-            self.thread = threading.Thread(target=self._broker, args=(prepared, jobs, generation, initial), daemon=True)
-            self.thread.start()
+            prepared = self.factory() if settings.get('effects') else None
+            with self._commit_lock:
+                if epoch != self._lifecycle_epoch:
+                    raise RuntimeError('Native loading cancelled during shutdown.')
+                self.preparing = prepared
+            has_state = any(item.get('state_id') for item in settings.get('effects', []))
+            initial_settings = deepcopy(settings)
+            if has_state:
+                initial_settings['bindings'] = {}
+            values = prepared.request('configure', settings=initial_settings) if prepared else settings
+            for index, item in enumerate(settings.get('effects', [])):
+                if item.get('state_id'):
+                    if item.get('state_binary') != fingerprint(item['path']):
+                        raise ValueError('Plugin binary changed since native state capture. Review before restoring.')
+                    raw = self.state_store.get(item['state_id'])
+                    if not raw:
+                        continue
+                    prepared.request('state_begin', index=index, size=len(raw), sha256=item['state_id'])
+                    for offset in range(0, len(raw), CHUNK):
+                        prepared.request('state_write', offset=offset,
+                            data=base64.b64encode(raw[offset:offset+CHUNK]).decode('ascii'))
+                    prepared.request('state_commit')
+            if prepared and has_state:
+                prepared.request('set_values', parameters=[s.get('parameters', {}) for s in settings['effects']])
+                values = prepared.request('inspect')
+                values['bindings'] = deepcopy(settings.get('bindings', {}))
+                for slot, original in zip(values['effects'], settings['effects']):
+                    for key in ('state_id', 'state_binary'):
+                        if key in original:
+                            slot[key] = original[key]
+                self.validate(values)
+            with self._commit_lock:
+                if epoch != self._lifecycle_epoch:
+                    raise RuntimeError('Native loading cancelled during shutdown.')
+                old_client, old_thread = self.client, self.thread
+                self.client, self.preparing = prepared, None
+                self.slots = deepcopy(values.get('effects', []))
+                self.bindings = deepcopy(values.get('bindings', {}))
+                self.error = ''
+                self.reset_pipeline()
+                self.thread = None
+                if prepared:
+                    initial = [dict(slot['parameters']) for slot in values['effects']]
+                    self.thread = threading.Thread(target=self._broker,
+                        args=(prepared, self.jobs, self.generation, initial), daemon=True)
+                    self.thread.start()
+                committed = True
+            if old_client:
+                old_client.close()
+            if old_thread:
+                old_thread.join(timeout=1)
+        finally:
+            if not committed and prepared:
+                prepared.close()
+            with self._commit_lock:
+                if self.preparing is prepared:
+                    self.preparing = None
+            self.loading = False
+            self._restore_lock.release()
 
     def add(self, path, plugin_name=None, parameters=None, bypass=False):
+        self.capture_states()
         values = self.settings()
         values['effects'].append({'path': str(path), 'plugin_name': plugin_name or '',
                                   'parameters': parameters or {}, 'bypass': bool(bypass)})
         self.restore(values)
 
     def remove(self, index):
+        self.capture_states()
         values = self.settings()
         values['effects'].pop(index)
         values['bindings'] = {key: {**item, 'slot': item['slot']-(item['slot'] > index)}
@@ -71,6 +132,7 @@ class IsolatedPluginRack:
         self.restore(values)
 
     def move(self, source, destination):
+        self.capture_states()
         values = self.settings()
         slots = values['effects']
         slots[source], slots[destination] = slots[destination], slots[source]
@@ -173,11 +235,47 @@ class IsolatedPluginRack:
         if self.editor_open or not self.client or self.error:
             raise RuntimeError('Restart a healthy rack before opening its editor.')
         self.editor_open = True
+        prior = self.settings()['effects']
         try:
             values = self.client.request('editor', timeout=None, index=index)
             self.slots = values['effects']
+            for slot, saved in zip(self.slots, prior):
+                for key in ('state_id', 'state_binary'):
+                    if key in saved:
+                        slot[key] = saved[key]
         finally:
             self.editor_open = False
+        self.capture_states()
+
+    def capture_states(self):
+        """Call only with audio stopped. Opaque state stays outside JSON manifests."""
+        if not self.client or not self.slots:
+            return
+        if self.editor_open:
+            raise RuntimeError('Close the native editor before capturing state.')
+        if self.loading:
+            raise RuntimeError('Wait for native loading before capturing state.')
+        self.client.request('set_values', parameters=[dict(s['parameters']) for s in self.slots])
+        current = self.client.request('inspect')
+        for slot, observed in zip(self.slots, current['effects']):
+            slot['parameters'] = dict(observed['parameters'])
+        captured = []
+        for index, slot in enumerate(self.slots):
+            info = self.client.request('state_info', index=index)
+            from .plugin_state import MAX_STATE, valid_id
+            if (type(info.get('size')) is not int or not 0 <= info['size'] <= MAX_STATE
+                    or not valid_id(info.get('sha256'))):
+                raise ValueError('Invalid worker state descriptor.')
+            raw = bytearray()
+            for offset in range(0, info['size'], CHUNK):
+                block = base64.b64decode(self.client.request('state_read', index=index, offset=offset), validate=True)
+                if len(block) != min(CHUNK, info['size']-offset):
+                    raise ValueError('Invalid worker native state chunk length.')
+                raw.extend(block)
+            identity = self.state_store.put(bytes(raw), expected=info['sha256'])
+            captured.append((identity, fingerprint(slot['path'])))
+        for slot, (identity, binary) in zip(self.slots, captured):
+            slot['state_id'], slot['state_binary'] = identity, binary
 
     def restart(self):
         self.restore(self.settings())
@@ -205,9 +303,13 @@ class IsolatedPluginRack:
         self.thread.start()
 
     def close(self):
-        client, self.client = self.client, None
+        with self._commit_lock:
+            self._lifecycle_epoch += 1
+            client, candidate, thread = self.client, self.preparing, self.thread
+            self.client, self.thread = None, None
+        if candidate and candidate is not client:
+            candidate.kill()
         if client:
             client.close()
-        if self.thread and self.thread is not threading.current_thread():
-            self.thread.join(timeout=1)
-        self.thread = None
+        if thread and thread is not threading.current_thread():
+            thread.join(timeout=1)

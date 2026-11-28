@@ -16,6 +16,14 @@ jobs:
         run: python -m pip install . pytest
       - name: Test standalone behavior
         run: python -m pytest tests -q
+      - name: Verify reviewed third-party effects and instrument
+        run: python tools/verify_plugins.py --staging plugin-staging --output plugin-reports
+      - uses: actions/upload-artifact@v4
+        with:
+          name: curated-plugin-reports
+          path: plugin-reports/*.json
+      - name: Short accelerated software endurance
+        run: python tools/verify_performance.py --seconds 60 --output endurance-current.json
       - name: Check out the published comparison baseline
         uses: actions/checkout@v4
         with:
@@ -29,4 +37,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: synthetic-audio-benchmarks
-          path: benchmark-*.json
+          path: |
+            benchmark-*.json
+            endurance-*.json

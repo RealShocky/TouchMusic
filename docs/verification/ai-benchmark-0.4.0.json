@@ -1,0 +1,21 @@
+{
+  "label": "v0.4.0",
+  "backend_sha256": "bd6396a2b172ff624d5254bc3324b043763f290b38720e56158e5c62834ad025",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 5060",
+  "torch": "2.11.0+cu128",
+  "model_load_seconds": 38.034304399974644,
+  "source_seconds": 2.0,
+  "conversion_seconds": [
+    1.0079235999146476,
+    0.37897760001942515
+  ],
+  "conversion_cpu_seconds": 2.15625,
+  "peak_process_memory_bytes": 3595272192,
+  "real_model_tested": true,
+  "gpu_peak_allocated_bytes": 2057714688,
+  "gpu_peak_reserved_bytes": 2296381440,
+  "physical_audio_devices_tested": false,
+  "listening_quality_tested": false,
+  "fixture_note": "The same two local references are used for both runs; no audio or reference identity is exported."
+}

@@ -1,0 +1,17 @@
+{
+  "simulated_audio_seconds": 60,
+  "hardware_audio_tested": false,
+  "gpu_inference_tested": false,
+  "physical_audio_dropouts": null,
+  "note": "Accelerated software endurance, not a real-time hardware performance.",
+  "plugin_restart_state_cycles": 10,
+  "owned_workers_remaining": 0,
+  "blocks": 5625,
+  "frames": 2880000,
+  "wall_seconds": 3.0510755999712273,
+  "process_cpu_seconds": 3.0,
+  "max_block_ms": 3.0023999279364944,
+  "synthetic_deadline_misses": 0,
+  "peak_process_memory_bytes": 68894720,
+  "output": "Finite and bounded for every block"
+}

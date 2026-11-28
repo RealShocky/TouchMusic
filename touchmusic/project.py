@@ -14,18 +14,29 @@ ASSETS = ('backing', 'loop-1', 'loop-2', 'loop-3', 'loop-4')
 RATE = 48000
 
 
-def save_project(path, settings, assets, voices=()):
+def save_project(path, settings, assets, voices=(), state_store=None):
     path = Path(path)
     voices = tuple(voices)
+    from .plugin_state import StateStore, state_ids, MAX_PROJECT_STATES
+    store = state_store or StateStore()
+    blobs, budget = {}, 0
+    for identity in state_ids(settings):
+        raw = store.get(identity)
+        budget += len(raw)
+        if budget > MAX_PROJECT_STATES:
+            raise ValueError('Native states exceed the 32 MiB project budget.')
+        blobs[identity] = raw
     with tempfile.NamedTemporaryFile(dir=path.parent, suffix='.tmp', delete=False) as file:
         temporary = Path(file.name)
     try:
         with ZipFile(temporary, 'w', ZIP_DEFLATED, compresslevel=1) as archive:
             manifest = json.dumps({'version': 1, 'settings': settings,
-                                   'assets': list(assets), 'voices': [voice for voice, _ in voices]})
+                                   'assets': list(assets), 'voices': [voice for voice, _ in voices], 'plugin_states': sorted(blobs)})
             if len(manifest.encode('utf-8')) > 2*1024*1024:
                 raise ValueError('Performance settings exceed the 2 MiB portable project limit.')
             archive.writestr('project.json', manifest)
+            for identity, raw in blobs.items():
+                archive.writestr('plugin-states/'+identity+'.bin', raw)
             for key, audio in assets.items():
                 buffer = io.BytesIO()
                 sf.write(buffer, audio, RATE, format='WAV', subtype='FLOAT')
@@ -44,7 +55,7 @@ def _read(archive, name, maximum):
     return archive.read(info)
 
 
-def load_project(path):
+def load_project(path, state_store=None):
     with ZipFile(path) as archive:
         manifest = json.loads(_read(archive, 'project.json', 2 * 1024 * 1024))
         if not isinstance(manifest, dict) or manifest.get('version') != 1:
@@ -75,6 +86,24 @@ def load_project(path):
             voices.append(({'id': identity, 'name': name, 'file': identity + '.wav', 'seconds': seconds}, wav))
         settings = manifest['settings']
         validate_settings(settings)
+        from .plugin_state import StateStore, state_ids, valid_id, MAX_STATE, MAX_PROJECT_STATES
+        identities = manifest.get('plugin_states', [])
+        if (not isinstance(identities, list) or len(identities) > 32
+                or any(not valid_id(identity) for identity in identities)
+                or len(set(identities)) != len(identities) or set(identities) != state_ids(settings)):
+            raise ValueError('Invalid portable native state inventory.')
+        blobs = {}
+        import hashlib
+        budget = 0
+        for identity in identities:
+            raw = _read(archive, 'plugin-states/'+identity+'.bin', MAX_STATE)
+            budget += len(raw)
+            if budget > MAX_PROJECT_STATES or hashlib.sha256(raw).hexdigest() != identity:
+                raise ValueError('Portable native state checksum or budget mismatch.')
+            blobs[identity] = raw
+        store = state_store or StateStore()
+        for identity, raw in blobs.items():
+            store.put(raw, expected=identity)
     return settings, assets, voices
 
 

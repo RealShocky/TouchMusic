@@ -1,6 +1,6 @@
 # TouchMusic
 
-> Development checkout: **0.5.0.dev2**, not a finished v0.5.0 release. Published stable downloads remain v0.4.0. The [authoritative roadmap](roadmap.md) tracks every requested feature, dependency and verification gate.
+> Development checkout: **0.5.0.dev3**, not a finished v0.5.0 release. Published stable downloads remain v0.4.0. The [authoritative roadmap](roadmap.md) tracks every requested feature, dependency and verification gate.
 
 
 ![Windows](https://img.shields.io/badge/platform-Windows_10%2F11-0078D4)
@@ -317,17 +317,17 @@ Stereo effect output is preserved through the master, device output and new ster
 
 Select a parameter and bind **Plugin knob 1..8**, then choose that knob in Gesture mapping. Or start the camera, choose **Gesture Learn**, and deliberately move a hand vertically/horizontally or change thumb-index spread. Learning disarms performance gestures and times out after ten seconds. Arm again when ready to perform.
 
-With audio stopped, **Open native editor** opens the actual plugin interface in its worker process. Close it before starting audio or changing the rack. Exposed parameter changes synchronize on close. The current runtime native state survives normal audio start/stop, but opaque programs/state are not yet saved across rack reloads or projects. Snapshots preserve normalized exposed parameters.
+With audio stopped, **Open native editor** opens the actual plugin interface in its worker process. Close it before starting audio or changing the rack. Exposed parameters synchronize and opaque native presets capture on close. **Capture native preset** saves the current worker state before saving a skit. Optional snapshots travel inside skits, with checksum and exact plugin-binary checks. Limits are 8 MiB per state and 32 MiB per project. Old parameter-only presets still load. Loading, restarting and capturing run in the background with audio stopped.
 
 Saved skits never automatically load native effects. Review the paths and choose **Restore saved rack**. Plugins must remain installed at their saved paths. This process boundary contains crashes, not malicious binaries running with your OS permissions.
 
-Plugin Center lists fifteen official publisher candidates and stages checksum-pinned TDR Nova 2.2.3, SnapTune 2.4.0 and LyraTune 0.6.7 archives. Downloaded files are never executed or automatically installed. Other candidates open their official publisher pages until an exact asset is reviewed. No third-party effects or personal references are redistributed. See the [versioned compatibility matrix](docs/PLUGIN_COMPATIBILITY.md), which distinguishes scan evidence from actual editor, listening, hardware and DAW checks.
+Plugin Center lists fifteen official publisher candidates and stages checksum-pinned TDR Nova 2.2.3, SnapTune 2.4.0 , LyraTune 0.6.7 and Surge XT 1.3.4 archives. Downloaded files are never executed or automatically installed. Other candidates open their official publisher pages until an exact asset is reviewed. No third-party effects or personal references are redistributed. See the [versioned compatibility matrix](docs/PLUGIN_COMPATIBILITY.md), which distinguishes scan evidence from actual editor, listening, hardware and DAW checks.
 
 ### Motion Score in the development checkout
 
 Open **Motion Score**, start audio and choose **Record**. Perform movement controls and deliberate finger/pinch actions, then **Stop**. Recording replaces the existing score. The event table lets you edit beat positions, targets and normalized values, apply edits, delete rows, and import/export JSON. **Play** explicitly replays automation and disarms camera gestures. Playback can change voices, loops, effects and MIDI. F12 stops playback, releases MIDI notes and mutes output.
 
-Scores are optional saved-performance data and never auto-play on load. The current beat timeline is serviced by the 100 ms UI timer, so it is not sample-accurate automation. Visual envelopes and deterministic scheduling remain on the roadmap.
+Scores are optional saved-performance data and never auto-play on load. Local DSP, loop, chord and instrument-note events follow the audio sample clock. Voice changes, macros and external MIDI use a 10 ms GUI relay; external plugin knobs apply at worker block boundaries. Dense or overflowing scores stop with an explanation. Visual envelopes and DAW automation editing remain on the roadmap.
 
 ### Loop performance tricks
 
@@ -351,7 +351,7 @@ The supported release is **Windows 10/11 x64 with Python 3.11**. Python modules 
 - [Architecture](docs/ARCHITECTURE.md): process boundaries, stereo/audio timing and compatibility contract.
 - [Technical debt](docs/TECHNICAL_DEBT.md): known risks and remediation.
 - [Plugin compatibility](docs/PLUGIN_COMPATIBILITY.md): exact binary/version evidence.
-- [Benchmarks](docs/BENCHMARKS.md): repeatable CPU/memory/timing comparison and explicitly unmeasured hardware/GPU checks.
+- [Benchmarks](docs/BENCHMARKS.md): repeatable CPU/GPU/memory/timing comparisons and explicitly unmeasured physical audio checks.
 
 Run `python -m pytest tests -q` for automated regressions. The synthetic benchmark is `python tools/benchmark_audio.py --label development --output benchmark.json`; it does not open audio hardware or invoke AI. Development versions are built/tested but are excluded from automatic stable GitHub/PyPI publishing.
 
@@ -362,6 +362,14 @@ Two new workspaces are available:
 - **Instruments**: explicitly load one VST3 synthesizer, start audio, and test C4 or a chord. Map Instrument C4..C5, Instrument chord I..VII and Instrument panic to poses. Eight Instrument knobs and Instrument level accept movement mappings. Notes have timed release, retrigger protection and panic on disarm. Instruments run in their own child process and contribute a stereo recording stem. Saved instruments require explicit reviewed restore. Third-party synth compatibility remains per binary, not guaranteed.
 - **DAW audio**: stop standalone audio, enable the receiver, and load **TouchMusic Audio Bridge.vst3** on a 48 kHz DAW insert. It sends DAW input through the standalone effects/AI path and returns stereo audio without a virtual cable. The model must be ready and AI enabled to convert a voice. The separate Control Bridge remains unchanged for automation/timing.
 
-The experimental Audio Bridge reports 4096 transport frames, about 85.3 ms at 48 kHz. AI buffering, external FX worker delay and instrument delay are additional and are not included in full DAW delay compensation yet. Fast offline rendering and non-48-kHz wet return are unsupported. Missing/late returns use delayed dry audio. Physical FL Studio, editor, microphone/camera and real-model DAW validation remain pending.
+The experimental Audio Bridge reports 4096 transport frames, about 85.3 ms at 48 kHz. AI buffering, external FX worker delay and instrument delay are additional and are not included in full DAW delay compensation yet. Fast offline rendering and non-48-kHz wet return are unsupported. Missing/late returns use delayed dry audio. Physical FL Studio and real-model DAW validation are delegated to external testers. Microphone/camera and listening checks remain pending.
 
 Actual native hosting returned 90 processed stereo blocks matching standalone DSP. Both compiled bridges passed 47 SDK checks each. Automated note/queue/rate/PCM/duplicate-packet/AI-routing tests are included. These are software tests, not listening or hardware certification.
+
+## Development increment 0.5.0.dev3
+
+Native preset capture/portable restore, responsive effect and instrument loading, per-data-folder single-instance ownership, sample-clock Motion Score playback and safer audio-device loss handling are implemented. Native editor close requests and parent-exit cleanup keep owned plugin workers from outliving the app.
+
+135 automated regressions pass. Real effect scans cover three rates and three block sizes with parameter sweeps. Nova 2.2.3 and LyraTune 0.6.7 pass all nine cases; SnapTune 2.4.0 fails this host's full-block contract at 96 kHz, so use its tested 44.1/48 kHz modes. Surge XT 1.3.4 passes isolated native state restore and stereo chord rendering. CI repeats the three reviewed open-source plugin probes, without distributing their binaries.
+
+An accelerated one-hour software DSP run passed in about two minutes; it is not a hardware soak. Paired actual RTX 5060 inference benchmarks and native GPU audio return are recorded in [Benchmarks](docs/BENCHMARKS.md). The streaming return recorded 122 converter underruns, which remain a measured production limitation. v0.5.0 is still under development. See the roadmap for full delay compensation, stereo asset migration, usability and hardware release gates.
