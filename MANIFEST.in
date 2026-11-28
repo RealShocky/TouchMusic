@@ -14,3 +14,5 @@ include docs/ARCHITECTURE.md docs/TECHNICAL_DEBT.md docs/PLUGIN_COMPATIBILITY.md
 recursive-include docs/verification *.json
 prune dist
 prune build
+
+include tools/verify_audio_bridge.py

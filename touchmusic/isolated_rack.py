@@ -115,9 +115,7 @@ class IsolatedPluginRack:
                 desired = [dict(s['parameters']) for s in self.slots]
                 changed = [{name: value for name, value in values.items() if applied[i].get(name) != value}
                            for i, values in enumerate(desired)]
-                result = client.request('process', audio=encode_audio(entry['dry']), rate=rate,
-                    parameters=changed,
-                    bypass=[s['bypass'] for s in self.slots])
+                result = self._request_audio(client, entry, rate, changed)
                 applied = desired
                 wet = decode_audio(result)
                 if wet.shape != (2, len(entry['dry'])):
@@ -144,7 +142,8 @@ class IsolatedPluginRack:
             frame = self.position
             key, within = divmod(frame, self.quantum)
             size = min(len(audio)-offset, self.quantum-within)
-            entry = self.entries.setdefault(key, {'dry': np.zeros(self.quantum, np.float32), 'wet': None})
+            entry = self.entries.setdefault(key, {'dry': np.zeros(self.quantum, np.float32),
+                                                 'wet': None, 'start': key*self.quantum})
             entry['dry'][within:within+size] = audio[offset:offset+size]
             if within+size == self.quantum and not self.error and not self.editor_open:
                 try:
@@ -165,6 +164,10 @@ class IsolatedPluginRack:
             offset += size
             self.position += size
         return output if stereo else output.mean(axis=0)
+
+    def _request_audio(self, client, entry, rate, changed):
+        return client.request('process', audio=encode_audio(entry['dry']), rate=rate,
+            parameters=changed, bypass=[s['bypass'] for s in self.slots])
 
     def show_editor(self, index):
         if self.editor_open or not self.client or self.error:

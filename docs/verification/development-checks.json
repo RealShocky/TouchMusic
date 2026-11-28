@@ -1,7 +1,7 @@
 {
-  "snapshot": "0.5.0.dev1",
+  "snapshot": "0.5.0.dev2",
   "python_tests": {
-    "passed": 113,
+    "passed": 121,
     "failed": 0,
     "scope": "Automated behavior and offscreen Qt"
   },
@@ -36,5 +36,11 @@
     "TDR Nova 2.2.3",
     "SnapTune 2.4.0",
     "LyraTune 0.6.7"
-  ]
+  ],
+  "audio_bridge_sdk": {
+    "passed": 47,
+    "failed": 0
+  },
+  "native_audio_return": "90 blocks match standalone DSP; no real model or hardware",
+  "vendor_instrument_compatibility": "Surge XT 1.3.4 stereo chord render: 70 blocks, no worker errors/fallback, no hardware/DAW check"
 }

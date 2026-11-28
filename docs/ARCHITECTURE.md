@@ -1,6 +1,6 @@
 # TouchMusic architecture
 
-Development snapshot: 0.5.0.dev1. Requirements and delivery status live only in [roadmap.md](../roadmap.md).
+Development snapshot: 0.5.0.dev2. Requirements and delivery status live only in [roadmap.md](../roadmap.md).
 
 ## Runtime boundaries
 
@@ -68,3 +68,11 @@ The existing VST3 Control Bridge remains version 0.4.0 and retains its protocol/
 ## Compatibility contract
 
 Existing v1 performance archives, normalized FX settings and gesture mappings remain readable. New Motion Score data is optional and never auto-plays. A saved external rack still requires explicit review/load. Preserving old mono loop assets avoids an untested schema change. Unknown/malformed automation is rejected before replacing a score. Future stereo assets, plugin blobs and audio bridge state require versioned, tested migrations.
+
+## dev2: separate synth and DAW audio buses
+
+InstrumentBus reuses the owned-process pipeline with a separate InstrumentBackend. Timestamped channel-zero MIDI is rendered in the worker; bounded commands and a bounded event heap track note generations so an earlier note-off cannot terminate a retrigger. Panic invalidates old queued commands. Silent worker input means failure falls back to silence rather than microphone audio. The stereo synth is mixed after the vocal rack and exported as its own stem. Native instruments are never automatically loaded from a session.
+
+The new Audio Bridge uses a distinct VST3 UID. Its audio callback only copies samples and exchanges bounded SPSC queues. A native network thread owns UDP; the Python receiver is loopback-only and processes one source at 48 kHz without a simultaneous PortAudio stream. Packet identity, source frame, shape, rate, kind and finite PCM are checked; duplicate/foreign packets are rejected. The DAW owns the input clock, eliminating a second device clock for this route. Missing returns use the matching delayed dry block.
+
+The native plugin reports 4096 transport frames. This is not total AI/FX latency compensation: converter and effect-worker delays still apply, and parameter automation is not sample-accurate across the process boundary. Offline fast rendering and non-48-kHz wet return are explicitly unsupported. Actual native-host DSP return was checked; FL Studio and real-model conversion inside a DAW remain pending.

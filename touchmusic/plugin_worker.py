@@ -46,6 +46,9 @@ def serve():
             request = json.loads(line)
             action = request['action']
             if action == 'configure':
+                if request.get('instrument'):
+                    from .instrument_backend import InstrumentBackend
+                    rack = InstrumentBackend()
                 rack.restore(request['settings'])
                 result = rack.settings()
             elif action == 'process':
@@ -55,7 +58,9 @@ def serve():
                 for slot, bypass in zip(rack.slots, request.get('bypass', [])):
                     slot['bypass'] = bool(bypass)
                 started = time.perf_counter()
-                audio = rack.process(decode_audio(request['audio']), request['rate'])
+                source = decode_audio(request['audio'])
+                audio = (rack.process(source.shape[-1], request['rate'], request.get('midi', []))
+                         if request.get('midi') is not None else rack.process(source, request['rate']))
                 result = {**encode_audio(audio), 'error': rack.error,
                           'compute_ms': (time.perf_counter() - started) * 1000}
             elif action == 'editor':

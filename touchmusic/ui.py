@@ -43,7 +43,8 @@ EFFECT_TARGETS = ['None', 'Reverb', 'Delay', 'Harmony', 'Robot', 'Pitch', 'Gain'
                   'Formant', 'Vibrato', 'Tempo', 'Overdub feedback', 'Loop edge fade',
                   'Count-in bars', 'Capture length', 'Song key', 'Chord selection',
                   *(f'Loop {i} level' for i in range(1, LOOP_COUNT + 1)),
-                  *(f'Plugin knob {i}' for i in range(1, 9)), *MIDI_LEVELS]
+                  *(f'Plugin knob {i}' for i in range(1, 9)), 'Instrument level',
+                  *(f'Instrument knob {i}' for i in range(1, 9)), *MIDI_LEVELS]
 VOICE_SLOTS = [f'Voice {number}' for number in range(1, 6)]
 BUILTIN_PRESETS = {
     'Clean': {}, 'Space': {'reverb': 65, 'delay': 35},
@@ -53,6 +54,8 @@ BUILTIN_PRESETS = {
     'Villain': {'pitch': -5, 'octave': 48, 'drive': 12, 'reverb': 20},
     'Ghost': {'chorus': 50, 'tremolo': 50, 'reverb': 55, 'delay': 15},
 }
+INSTRUMENT_NOTES = {f'Instrument {name}': note for name, note in [('C4',60),('D4',62),('E4',64),('F4',65),('G4',67),('A4',69),('B4',71),('C5',72)]}
+INSTRUMENT_CHORDS = {f'Instrument chord {degree}': i for i, degree in enumerate(DEGREES)}
 LOOP_ACTIONS = {
     f'{label} {i+1}': (command, i)
     for i in range(LOOP_COUNT)
@@ -61,7 +64,7 @@ LOOP_ACTIONS = {
 }
 CHORD_ACTIONS = [f'Chord {degree}' for degree in DEGREES]
 TUNE_PRESETS = {'Natural': (55, 30), 'Tight': (80, 60), 'Hard': (100, 100)}
-ACTIONS = ['None', *VOICE_SLOTS, 'Next voice', 'Previous voice', 'Loop', *LOOP_ACTIONS,
+ACTIONS = ['None', *INSTRUMENT_NOTES, *INSTRUMENT_CHORDS, 'Instrument panic', *VOICE_SLOTS, 'Next voice', 'Previous voice', 'Loop', *LOOP_ACTIONS,
            'Next loop', 'Previous loop', 'Mute output', 'AI conversion', 'Dialogue mode',
            'Play / pause track', 'Restart track', 'Record performance', *BUILTIN_PRESETS,
            *CHORD_ACTIONS, 'Next chord', 'Previous chord', 'Toggle chords', 'Toggle Auto-Tune',
@@ -139,7 +142,8 @@ class PitchMeter(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('TouchMusic • Standalone')
+        from .runtime import VERSION
+        self.setWindowTitle('TouchMusic '+VERSION+' | Standalone Studio')
         self.resize(1280, 880)
         self.setStyleSheet(STYLE)
         DATA.mkdir(parents=True, exist_ok=True)
@@ -265,7 +269,7 @@ class MainWindow(QMainWindow):
         self.camera_index.setFixedWidth(60)
         camera_row.addWidget(self.camera_index)
         self.arm = QCheckBox('Arm gestures')
-        self.arm.toggled.connect(lambda armed: self.midi.panic() if not armed else None)
+        self.arm.toggled.connect(lambda armed: (self.midi.panic(), self.engine.instrument.panic()) if not armed else None)
         self.arm.toggled.connect(lambda _: self.precision.reset())
         camera_row.addWidget(self.arm)
         self.rehearse = QCheckBox('Rehearse gestures')
@@ -439,6 +443,16 @@ class MainWindow(QMainWindow):
         self.plugin_dialog = PluginDialog(self)
         from .plugin_center import PluginCenter
         self.plugin_center = PluginCenter(self, DATA)
+        from .instrument_dialog import InstrumentDialog
+        self.instrument_dialog = InstrumentDialog(self)
+        from .audio_bridge_dialog import AudioBridgeDialog
+        self.audio_bridge_dialog = AudioBridgeDialog(self)
+        if isinstance(self.settings.get('instrument'), dict) and self.settings['instrument'].get('effects'):
+            try:
+                self.engine.instrument.validate(self.settings['instrument'])
+                self.instrument_dialog.pending = self.settings['instrument']
+            except ValueError as exc:
+                self.notice.setText(str(exc))
         from .motion_dialog import MotionDialog
         self.motion_dialog = MotionDialog(self)
         if 'motion_score' in self.settings:
@@ -458,7 +472,7 @@ class MainWindow(QMainWindow):
         performance_page = self.takeCentralWidget()
         self.workspaces = Workspaces(self, performance_page, [
             ('Voice lab', self.comparison), ('FX rack', self.plugin_dialog), ('Plugin Center', self.plugin_center),
-            ('Motion Score', self.motion_dialog), ('Songs', self.setlist_dialog),
+            ('DAW audio', self.audio_bridge_dialog), ('Instruments', self.instrument_dialog), ('Motion Score', self.motion_dialog), ('Songs', self.setlist_dialog),
             ('Gestures', self.gesture_dialog), ('Macros', self.macro_dialog), ('Music & chords', self.music_dialog),
             ('Audio setup', self.audio_setup), ('MIDI / DAW', self.midi_dialog), ('VST3 bridge', self.bridge_dialog)])
         self.setCentralWidget(self.workspaces)
@@ -491,6 +505,8 @@ class MainWindow(QMainWindow):
         tools.addAction('Voice comparison lab', self.open_comparison)
         tools.addAction('VST3 effect rack', self.open_plugins)
         tools.addAction('Plugin Center', lambda: self.workspaces.open('Plugin Center'))
+        tools.addAction('DAW audio return', lambda: self.workspaces.open('DAW audio'))
+        tools.addAction('Instruments', lambda: self.workspaces.open('Instruments'))
         tools.addAction('Motion Score', lambda: self.workspaces.open('Motion Score'))
         tools.addAction('Gesture macros', self.open_macros)
         tricks = tools.addMenu('Loop playback')
@@ -750,7 +766,7 @@ class MainWindow(QMainWindow):
         if key == 'quality':
             if self.engine.converter:
                 self.engine.converter.set_quality(value)
-        elif key == 'chord' and self.engine.stream:
+        elif key == 'chord' and (self.engine.stream or self.engine.external):
             self.engine.commands.put(('chord', value))
         elif key == 'overdub_feedback':
             self.engine.params[key] = value / 100
@@ -853,6 +869,16 @@ class MainWindow(QMainWindow):
                     slider.setValue(BUILTIN_PRESETS[name].get(key, EFFECT_DEFAULTS.get(key, 0)))
 
     def apply_performance(self, saved):
+        if isinstance(saved.get('instrument'), dict):
+            if self.engine.instrument.apply_values(saved['instrument']):
+                self.instrument_dialog.pending = None
+            else:
+                self.engine.instrument.panic()
+                for slot in self.engine.instrument.slots:
+                    slot['bypass'] = True
+                self.instrument_dialog.pending = saved['instrument']
+        if type(saved.get('instrument_gain')) in (int, float) and 0 <= saved['instrument_gain'] <= 1:
+            self.instrument_dialog.level.setValue(round(saved['instrument_gain']*100))
         if 'motion_score' in saved and not self.motion_dialog.replaying:
             self.motion_dialog.checked_load(saved['motion_score'])
         if isinstance(saved.get('plugins'), dict):
@@ -940,6 +966,8 @@ class MainWindow(QMainWindow):
             'gesture_precision': self.precision_dialog.settings(),
             'macros': self.macro_bank.settings(),
             'motion_score': self.motion_dialog.score.settings(),
+            'instrument': self.instrument_dialog.pending if self.instrument_dialog.pending is not None else self.engine.instrument.settings(),
+            'instrument_gain': self.engine.instrument.gain,
             'plugins': self.plugin_dialog.pending if self.plugin_dialog.pending is not None else self.engine.rack.settings(),
         }
 
@@ -995,7 +1023,7 @@ class MainWindow(QMainWindow):
             return False
 
     def apply_session(self, settings, assets, voices):
-        if self.engine.stream:
+        if self.engine.stream or self.engine.external:
             self.toggle_audio()
         self.arm.setChecked(False)
         self.library.restore_references(voices)
@@ -1074,7 +1102,7 @@ class MainWindow(QMainWindow):
         save_json(self.settings_path, self.settings)
 
     def refresh_devices(self):
-        if self.engine.stream:
+        if self.engine.stream or self.engine.external:
             self.notice.setText('Stop audio before refreshing devices.')
             return
         old_input = self.inputs.currentText() or self.settings.get('input', '')
@@ -1118,8 +1146,12 @@ class MainWindow(QMainWindow):
         self.outputs.setCurrentIndex(max(index, 0))
 
     def toggle_audio(self):
+        if self.engine.external:
+            self.audio_bridge_dialog.enabled.setChecked(False)
+            self.notice.setText('DAW audio receiver stopped')
+            return
         try:
-            if self.engine.stream:
+            if self.engine.stream or self.engine.external:
                 recorder = self.engine.stop()
                 self.music_controls['chord'].setCurrentIndex(self.engine.params['chord'])
                 self.audio_button.setText('Start audio')
@@ -1198,7 +1230,7 @@ class MainWindow(QMainWindow):
 
     def preview_voice(self):
         voice = self.current_voice()
-        if not self.engine.stream:
+        if not (self.engine.stream or self.engine.external):
             self.notice.setText('Start audio to preview the selected reference.')
             return
         if voice:
@@ -1386,7 +1418,7 @@ class MainWindow(QMainWindow):
         self.notice.setText('Output muted and gestures disarmed. Recording continues. Unmute when ready.')
 
     def test_output(self):
-        if not self.engine.stream:
+        if not (self.engine.stream or self.engine.external):
             self.notice.setText('Start audio first, then Session > Test output. Set your speaker volume low.')
             return
         if self.engine.muted:
@@ -1487,6 +1519,12 @@ class MainWindow(QMainWindow):
     def gesture_level(self, target, value):
         if self.rehearse.isChecked():
             return
+        if target == 'Instrument level':
+            self.instrument_dialog.level.setValue(round(value*100))
+            return
+        if target.startswith('Instrument knob '):
+            self.engine.instrument.control(int(target.split()[-1]), value)
+            return
         if target.startswith('Plugin knob '):
             self.engine.rack.control(int(target.split()[-1]), value)
             return
@@ -1536,7 +1574,7 @@ class MainWindow(QMainWindow):
                 self.notice.setText('Return this loop to Normal playback before overdubbing.')
                 return
         self.engine.commands.put((action, index))
-        if not self.engine.stream:
+        if not (self.engine.stream or self.engine.external):
             self.engine.apply_loop_commands()
 
     def export_loop(self):
@@ -1567,6 +1605,12 @@ class MainWindow(QMainWindow):
             if not self.macro_bank.definitions.get(action):
                 self.notice.setText('Configure this slot in Session > Gesture macros first.')
             self.macro_bank.run(action, self.gesture_action)
+        elif action == 'Instrument panic':
+            self.engine.instrument.panic()
+        elif action in INSTRUMENT_NOTES or action in INSTRUMENT_CHORDS:
+            notes = [INSTRUMENT_NOTES[action]] if action in INSTRUMENT_NOTES else [
+                int(note+48) for note in chord_notes(self.engine.params['key'], self.engine.params['scale'], INSTRUMENT_CHORDS[action])]
+            self.instrument_dialog.play(notes)
         elif action in MIDI_ACTIONS:
             if action == 'MIDI panic':
                 self.midi.panic()
@@ -1680,7 +1724,7 @@ class MainWindow(QMainWindow):
             self.record_button.setText('Record performance')
             self.show_recording_result(recorder)
         else:
-            if not self.engine.stream:
+            if not (self.engine.stream or self.engine.external):
                 self.notice.setText('Start audio before recording.')
                 return
             folder = DATA / 'recordings'
@@ -1711,6 +1755,7 @@ class MainWindow(QMainWindow):
             self.notice.setText(f'Recording saved. Dropped audio blocks: {recorder.dropped}.')
 
     def tick(self):
+        self.audio_bridge_dialog.poll()
         self.plugin_dialog.poll()
         self.motion_dialog.tick()
         self.bridge_dialog.poll()
@@ -1804,7 +1849,7 @@ class MainWindow(QMainWindow):
         if queued is not None:
             chord_text += f' → {DEGREES[queued]} queued'
         recording = '  |  Recording' if self.engine.recorder else ''
-        audio = 'Audio on' if self.engine.stream else 'Audio off'
+        audio = 'DAW audio' if self.engine.external else 'Audio on' if self.engine.stream else 'Audio off'
         gestures = 'Gestures armed' if self.arm.isChecked() else 'Gestures off'
         pending_fx = '  |  FX rack awaits review' if self.plugin_dialog.pending is not None else ''
         self.music_status.setText(f"{voice['name'] if voice else 'No voice selected'}  |  {NOTES[p['key']]} {p['scale']}  |  "
@@ -1823,6 +1868,9 @@ class MainWindow(QMainWindow):
             super().keyPressEvent(event)
 
     def closeEvent(self, event):
+        if not self.audio_bridge_dialog.server.close():
+            event.ignore()
+            return
         self.plugin_center.shutdown()
         self.stage_view.hide()
         self.bridge_dialog.server.close()
@@ -1833,6 +1881,7 @@ class MainWindow(QMainWindow):
         self.midi.close()
         self.engine.stop()
         self.engine.rack.close()
+        self.engine.instrument.close()
         if self.camera:
             self.closing = True
             self.camera.stop()

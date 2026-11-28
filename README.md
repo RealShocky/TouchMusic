@@ -1,6 +1,6 @@
 # TouchMusic
 
-> Development checkout: **0.5.0.dev1**, not a finished v0.5.0 release. Published stable downloads remain v0.4.0. The [authoritative roadmap](roadmap.md) tracks every requested feature, dependency and verification gate.
+> Development checkout: **0.5.0.dev2**, not a finished v0.5.0 release. Published stable downloads remain v0.4.0. The [authoritative roadmap](roadmap.md) tracks every requested feature, dependency and verification gate.
 
 
 ![Windows](https://img.shields.io/badge/platform-Windows_10%2F11-0078D4)
@@ -354,3 +354,14 @@ The supported release is **Windows 10/11 x64 with Python 3.11**. Python modules 
 - [Benchmarks](docs/BENCHMARKS.md): repeatable CPU/memory/timing comparison and explicitly unmeasured hardware/GPU checks.
 
 Run `python -m pytest tests -q` for automated regressions. The synthetic benchmark is `python tools/benchmark_audio.py --label development --output benchmark.json`; it does not open audio hardware or invoke AI. Development versions are built/tested but are excluded from automatic stable GitHub/PyPI publishing.
+
+## Development increment 0.5.0.dev2
+
+Two new workspaces are available:
+
+- **Instruments**: explicitly load one VST3 synthesizer, start audio, and test C4 or a chord. Map Instrument C4..C5, Instrument chord I..VII and Instrument panic to poses. Eight Instrument knobs and Instrument level accept movement mappings. Notes have timed release, retrigger protection and panic on disarm. Instruments run in their own child process and contribute a stereo recording stem. Saved instruments require explicit reviewed restore. Third-party synth compatibility remains per binary, not guaranteed.
+- **DAW audio**: stop standalone audio, enable the receiver, and load **TouchMusic Audio Bridge.vst3** on a 48 kHz DAW insert. It sends DAW input through the standalone effects/AI path and returns stereo audio without a virtual cable. The model must be ready and AI enabled to convert a voice. The separate Control Bridge remains unchanged for automation/timing.
+
+The experimental Audio Bridge reports 4096 transport frames, about 85.3 ms at 48 kHz. AI buffering, external FX worker delay and instrument delay are additional and are not included in full DAW delay compensation yet. Fast offline rendering and non-48-kHz wet return are unsupported. Missing/late returns use delayed dry audio. Physical FL Studio, editor, microphone/camera and real-model DAW validation remain pending.
+
+Actual native hosting returned 90 processed stereo blocks matching standalone DSP. Both compiled bridges passed 47 SDK checks each. Automated note/queue/rate/PCM/duplicate-packet/AI-routing tests are included. These are software tests, not listening or hardware certification.

@@ -1,3 +1,15 @@
+# TouchMusic 0.5.0.dev2 (unreleased)
+
+- New isolated VST3 instrument bus and Instruments workspace: timed note/chord gestures, parameter knobs, level, note retrigger protection, panic, explicit saved-instrument restore and stereo instrument stem.
+- New native TouchMusic Audio Bridge and DAW audio workspace: opt-in localhost stereo return through standalone DSP and the enabled converter path at 48 kHz. The existing ten-control VST3 bridge keeps its UID and behavior.
+- Audio transport uses bounded queues off the native audio callback, fixed 4096-frame transport delay and delayed dry fallback. Actual native hosting returned 90 processed blocks matching standalone DSP; both native plugins passed 47 SDK validator checks each.
+- Added MIDI lifecycle, native backend, bounded packet, duplicate rejection, stereo return and converter routing regressions. 121 Python tests passed.
+- Version is visible in the application title. Updated package workflows build and validate both bridges, and include both in the native ZIP.
+
+This remains a development snapshot. Full AI/FX delay compensation, fast offline return, further sample rates, vendor instrument compatibility, opaque plugin state and deterministic Motion Score scheduling are unfinished. Actual FL Studio, physical devices, editor windows and real AI-model DAW validation have not been performed. Stable public downloads remain v0.4.0.
+
+---
+
 # TouchMusic 0.5.0 development snapshot (unreleased)
 
 This is **0.5.0.dev1**, the first stability increment toward the ten-feature v0.5.0 goal. It is not the complete v0.5.0 release. Stable public downloads remain v0.4.0.

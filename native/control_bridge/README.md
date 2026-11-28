@@ -30,3 +30,7 @@ Requires CMake 3.25+, C++17, and a native compiler. On Windows use Visual Studio
 CMake fetches pinned Steinberg VST3 SDK 3.8.1 sources. Set TOUCHMUSIC_VST3_SDK to a complete local SDK checkout to build without fetching. The SDK validator runs after compilation. Source uses portable socket branches, but this release is built and verified on Windows only.
 
 The SDK's MIT notice is included in STEINBERG-LICENSE.txt. VST is a trademark of Steinberg Media Technologies GmbH.
+
+## Experimental Audio Bridge in dev2
+
+The native ZIP now contains a separate TouchMusic Audio Bridge.vst3. At 48 kHz, stop standalone microphone audio, enable DAW audio in TouchMusic, then load this plugin on an audio insert. It returns the standalone DSP/converter output over localhost without VB-CABLE. Enable a ready AI engine in TouchMusic to use conversion. Its reported 4096-frame transport delay excludes additional AI/FX delays. Fast offline rendering and other wet sample rates are not supported. A disconnected receiver falls back to delayed dry audio. This plugin has a distinct UID and does not alter saved Control Bridge instances.

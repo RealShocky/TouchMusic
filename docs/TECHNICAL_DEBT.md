@@ -21,3 +21,9 @@ This document explains implementation risks. [roadmap.md](../roadmap.md) owns fe
 | TD15 | Downloads | Three exact official archives currently reviewed and pinned | Review additional publisher assets, terms, platform/version/size/hash provenance and controlled extraction/install UX |
 
 Do not resolve these by suppressing error counters, claiming unperformed hardware checks, or silently removing creative features. Preserve the baseline, surface degradation, and tie each fix to a measurable regression check.
+
+## dev2 additions
+
+- Complete compensation for converter/effect delay in the Audio Bridge, support offline/rate negotiation, and perform actual DAW/real-model checks before production use.
+- Expand instrument preset/voice-release soak tests. Surge XT 1.3.4 has a real stereo render check; this does not certify every preset or other instruments. The normalized instrument adapter uses Pedalboard native parameter internals, so Pedalboard is pinned to 0.9.26 and adapter regression checks are required before upgrades.
+- Instrument loading is still synchronous and timeout bounded; asynchronous cancellable initialization remains required.

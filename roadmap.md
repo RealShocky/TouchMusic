@@ -12,7 +12,7 @@ Updated 2026-11-28. This is the single requirements and delivery tracker. It sup
 
 Priority P0 is stability and compatibility, P1 is production functionality, P2 is expansion. Windows x64 is the supported platform. Python portability does not establish macOS/Linux support.
 
-Current automated checkpoint: **113 Python tests**, **47 native SDK checks**, actual native host/control transport, package metadata and installed GUI/worker startup passed. [Evidence](docs/verification/development-checks.json). These are software checks, not microphone/camera/DAW validation.
+Current automated checkpoint: **121 Python tests**, **94 native SDK checks across two bridges**, actual native host/control transport, package metadata and installed GUI/worker startup passed. [Evidence](docs/verification/development-checks.json). These are software checks, not microphone/camera/DAW validation.
 
 The published baseline is **v0.4.0**. **v0.5.0 is in development, not released or production certified.** The ten requested v0.5.0 capabilities below are the release scope. A partial implementation does not satisfy that release gate.
 
@@ -27,8 +27,8 @@ The published baseline is **v0.4.0**. **v0.5.0 is in development, not released o
 | V50-05 | P1 | Native plugin editor interfaces | Implemented | Actual Pedalboard show_editor runs on the plugin worker main thread. Audio must be stopped, UI remains responsive, exposed parameters synchronize on close. Broker routing tested; actual vendor editor opening/closing remains unverified. Opaque state persistence is a separate dependency. |
 | V50-06 | P0 | Stereo audio engine | In Progress | External stereo FX survive through hardware callback and new stereo performance/stem WAVs; mono processing API and legacy loops remain compatible. Stereo regression test passes. Stereo backing/reference/loop assets and full project migration remain planned. |
 | V50-07 | P1 | Gesture Learn | Implemented | Select effect parameter/knob and move a hand axis. Deliberate dominant motion binds height, horizontal position or spread, with timeout/cancel and disarmed performance. Pure and UI regression tests pass; physical webcam validation remains pending. |
-| V50-08 | P1 | Full DAW AI audio bridge | Planned | Depends on V50-01/06 and stable timing. Preserve existing control bridge. Add bounded bidirectional audio transport, stream identity, sample provenance, declared delay, rate/block negotiation, drift handling and failover. Verify real processed AI return inside a DAW before claiming completion. |
-| V50-09 | P1 | Isolated VST3 instruments | Planned | Depends on V50-01/06. Separate synth bus, timestamped MIDI, voice/note lifecycle, panic, chords and gesture notes. Effect rack continues rejecting instruments until this path exists. Test Surge XT/Cardinal exact builds, note-off and restart behavior. |
+| V50-08 | P1 | Full DAW AI audio bridge | In Progress | Native Audio Bridge plus opt-in 48 kHz stereo receiver implemented. Actual host returned 90 blocks matching standalone DSP; 47 SDK checks passed. The existing control bridge is preserved. Transport delay is 4096 frames; full AI/FX compensation, offline rendering, additional rates and actual FL/real-model checks remain pending. |
+| V50-09 | P1 | Isolated VST3 instruments | In Progress | Separate stereo synth worker, timestamped MIDI, bounded notes, retrigger-safe release, panic, gesture notes/chords/knobs, explicit restore and recording stem implemented. Automated MIDI/backend tests pass. Surge XT 1.3.4 generated finite stereo over 70 paced blocks with zero worker errors/fallback. The normalized adapter is pinned to Pedalboard 0.9.26; vendor/editor/physical/DAW checks remain distinct. |
 | V50-10 | P1 | Motion Score | In Progress | Beat-based movement/action recording, event editing/deletion, JSON import/export, explicit replay and optional saved-performance data implemented. Automated event/tempo/persistence tests pass. Current playback uses the 100 ms UI timer; sample-accurate scheduling, visual envelope editing and DAW automation capture remain planned. |
 
 ### Dependency order
@@ -110,7 +110,7 @@ Authoritative results are in [plugin compatibility matrix](docs/PLUGIN_COMPATIBI
 
 ## Consolidation and resolved conflicts
 
-- Standalone plugin hosting and the DAW bridge are independent systems. V50-01 is plugin fault containment; V50-08 is audio transport. The existing control bridge satisfies neither full audio transport nor sample-accurate synchronization.
+- Standalone plugin hosting and the DAW bridge are independent systems. V50-01 is plugin fault containment; V50-08 is audio transport. The existing control bridge remains automation-only; the separate experimental Audio Bridge implements live audio return, with full latency compensation still pending.
 - Automatic discovery means finding paths without loading native code. Explicit isolated scans and reviewed restores remain required.
 - A native editor is the third-party UI in its worker process. Its exposed parameter changes can persist now; complete opaque preset state is P02.
 - Free download, open-source license, redistribution rights, and measured compatibility are separate properties.

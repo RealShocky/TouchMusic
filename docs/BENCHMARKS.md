@@ -44,3 +44,5 @@ Still required for v0.5.0: sustained native worker/editor restarts, a 60-minute 
 This development checkpoint passed 113 Python tests and reran 47 SDK checks against the unchanged compiled control bridge. Wheel/sdist metadata, a separate-target installed GUI/worker startup and setup archive allowlists also passed. [Verification record](verification/development-checks.json).
 
 SnapTune 2.4.0 and LyraTune 0.6.7 also passed isolated 100-block scans. A paced SnapTune/Nova chain had zero pre-fault fallback segments, survived deliberate worker termination with finite stereo fallback, and explicitly restarted. See the compatibility matrix and raw fault report.
+
+The dev2 candidate adds the empty instrument bus and was measured again: [dev2 synthetic CPU/memory/GPU telemetry record](verification/benchmark-0.5.0.dev2.json). No actual GPU inference, physical dropout or round-trip measurement was performed.

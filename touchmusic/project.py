@@ -21,8 +21,11 @@ def save_project(path, settings, assets, voices=()):
         temporary = Path(file.name)
     try:
         with ZipFile(temporary, 'w', ZIP_DEFLATED, compresslevel=1) as archive:
-            archive.writestr('project.json', json.dumps({'version': 1, 'settings': settings,
-                             'assets': list(assets), 'voices': [voice for voice, _ in voices]}))
+            manifest = json.dumps({'version': 1, 'settings': settings,
+                                   'assets': list(assets), 'voices': [voice for voice, _ in voices]})
+            if len(manifest.encode('utf-8')) > 2*1024*1024:
+                raise ValueError('Performance settings exceed the 2 MiB portable project limit.')
+            archive.writestr('project.json', manifest)
             for key, audio in assets.items():
                 buffer = io.BytesIO()
                 sf.write(buffer, audio, RATE, format='WAV', subtype='FLOAT')
@@ -78,6 +81,9 @@ def load_project(path):
 def validate_settings(settings, include_scenes=True):
     if not isinstance(settings, dict):
         raise ValueError('Invalid project settings.')
+    if 'instrument' in settings:
+        from .instrument import InstrumentBus
+        InstrumentBus.validate(settings['instrument'])
     if 'motion_score' in settings:
         from .motion_score import MotionScore
         MotionScore.validate(settings['motion_score'])

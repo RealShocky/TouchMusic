@@ -11,13 +11,14 @@ from .transport import BeatClock
 from .vocal import FormantShifter, VocalAnalysis, harmony_shift
 from .alignment import align_recording, mix_stems
 from .isolated_rack import IsolatedPluginRack
+from .instrument import InstrumentBus
 
 RATE = 48000
 BLOCK = 512
 LOOP_COUNT = 4
 LOOP_SECONDS = 120
 STEM_NAMES = ('dry-mic', 'wet-vocal', *(f'loop-{i}' for i in range(1, LOOP_COUNT + 1)),
-              'backing', 'chords')
+              'backing', 'chords', 'instrument')
 
 
 class SamplePlayer:
@@ -348,6 +349,8 @@ class AudioEngine:
         self.track, self.preview = SamplePlayer(), SamplePlayer()
         self.test_tone = SamplePlayer()
         self.rack = IsolatedPluginRack()
+        self.instrument = InstrumentBus()
+        self.external = False
         self.rack_origins = np.full(self.rack.latency_frames, -1, np.int64)
         self.loops = [LoopTrack(RATE) for _ in range(LOOP_COUNT)]
         self.loop = self.loops[0]
@@ -591,9 +594,10 @@ class AudioEngine:
         backing = self.track.read(len(audio)) * self.track.gain
         chords = self.pad.process(len(audio), chord, p['chord_level'] if p['chord_enabled'] else 0)
         accompaniment += backing + chords
+        synth = self.instrument.read(len(audio))
         if recorder:
-            mix = np.tanh((vocal + accompaniment[:, None]) * p['master'])
-            stems = (dry, vocal, *loop_stems, backing, chords) if recorder.stem_dir else ()
+            mix = np.tanh((vocal + accompaniment[:, None] + synth) * p['master'])
+            stems = (dry, vocal, *loop_stems, backing, chords, synth) if recorder.stem_dir else ()
             if recorder.channels == 1:
                 mix = mix.mean(axis=1)
                 stems = tuple(s.mean(axis=1) if s.ndim == 2 else s for s in stems)
@@ -606,7 +610,7 @@ class AudioEngine:
         counting = any(key[0] in ('loop', 'overdub') and key in self.clock.beat_targets
                        for key in self.clock.pending)
         click = self.clock.click(len(audio)) if p['metronome'] or counting else 0
-        output = np.tanh((heard + (accompaniment + preview + click)[:, None]) * p['master']).astype(np.float32)
+        output = np.tanh((heard + (accompaniment + preview + click)[:, None] + synth) * p['master']).astype(np.float32)
         if self.muted:
             output.fill(0)
         self.peak = float(np.max(np.abs(output)))
@@ -651,6 +655,8 @@ class AudioEngine:
             self.max_callback_ms = max(self.max_callback_ms, self.callback_ms)
 
     def start(self, input_device, output_device):
+        if self.external:
+            raise ValueError('Stop the DAW audio receiver before starting microphone audio.')
         if self.rack.editor_open or self.rack.editor_pending:
             raise ValueError('Close the native plugin editor before starting audio.')
         input_info = sd.query_devices(input_device, 'input')
@@ -664,6 +670,8 @@ class AudioEngine:
         self.stop()
         if self.rack.slots:
             self.rack.reset_stream()
+        if self.instrument.slots:
+            self.instrument.reset_stream()
         self.rack_origins.fill(-1)
         self.clock = BeatClock(RATE)
         self.clock.set_tempo(self.params['bpm'], self.params['quantize'])
@@ -693,6 +701,7 @@ class AudioEngine:
         self.stream = stream
 
     def stop(self):
+        self.instrument.panic()
         self.test_tone.load([])
         if self.stream:
             self.stream.stop()
@@ -708,7 +717,7 @@ class AudioEngine:
         return self.stop_recording()
 
     def start_recording(self, path, stems=False, align=False):
-        if not self.stream:
+        if not self.stream and not self.external:
             raise ValueError('Start audio before recording.')
         self.stop_recording()
         self.recorder = Recorder(path, stems=stems, align=align, channels=2)

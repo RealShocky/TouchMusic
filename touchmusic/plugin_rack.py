@@ -144,7 +144,7 @@ class PluginRack:
             self.error = ''
 
     @staticmethod
-    def validate(settings):
+    def validate(settings, maximum_parameters=2048):
         if not isinstance(settings, dict) or not isinstance(settings.get('effects', []), list):
             raise ValueError('Invalid plugin rack settings.')
         effects = settings.get('effects', [])
@@ -157,7 +157,7 @@ class PluginRack:
                     or not isinstance(item.get('parameters', {}), dict)):
                 raise ValueError('Invalid saved effect.')
             values = item.get('parameters', {})
-            if len(values) > 2048 or any(not isinstance(name, str) or type(value) not in (int, float)
+            if len(values) > maximum_parameters or any(not isinstance(name, str) or type(value) not in (int, float)
                     or not math.isfinite(value) or not 0 <= value <= 1 for name, value in values.items()):
                 raise ValueError('Invalid saved plugin parameters.')
         bindings = settings.get('bindings', {})

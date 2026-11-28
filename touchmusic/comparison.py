@@ -140,7 +140,7 @@ class VoiceComparison(QDialog):
 
     def run(self):
         parent = self.owner
-        if parent.engine.stream:
+        if parent.engine.stream or parent.engine.external:
             self.status.setText('Stop main audio before rendering a comparison.')
             return
         try:

@@ -52,3 +52,9 @@ Record separate editor open/close checks, sustained automation, pluginval logs, 
 Additional exact binary records: [SnapTune 2.4.0](verification/snaptune-2.4.0-scan.json), [LyraTune 0.6.7](verification/lyratune-0.6.7-scan.json). The catalog's pinned SnapTune/LyraTune archive hashes match GitHub release asset digest metadata from their publisher repositories. Native binaries are not redistributed.
 
 A two-effect SnapTune 2.4.0 -> TDR Nova 2.2.3 scheduled chain completed 72 paced blocks with zero fallback segments before the owned worker was deliberately terminated. TouchMusic detected the exit, returned finite stereo delayed-dry fallback and successfully restarted the rack. This is software fault injection, not an audio-device or listening test. [Raw result](verification/plugin-chain-fault.json).
+
+## dev2 Audio Bridge and instrument results
+
+TouchMusic Audio Bridge 0.5.0: 47 SDK validator checks passed. Actual Pedalboard hosting at 48 kHz sent/returned 90 stereo blocks with zero gaps/rejections; returned audio matched standalone DSP after the 4096-frame transport schedule. No real AI model, physical audio device or DAW was used. [Raw report](verification/native-audio-return.json).
+
+Surge XT 1.3.4 Windows x64: finite stereo chord rendering passed across 70 paced 512-frame blocks at 48 kHz, with zero worker errors/fallback. 2855 raw normalized parameters were exposed. Publisher-supported portable user data was used; a dedicated normalized adapter avoids expensive speculative text/range inference. No factory-content/preset library certification, listening, editor or DAW check is claimed. [Exact binary report](verification/surge-xt-1.3.4.json).

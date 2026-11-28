@@ -95,7 +95,7 @@ class PluginDialog(QDialog):
         if self.rack.editor_open or (self.editor_task and self.editor_task.is_alive()):
             self.status.setText('Close the native editor before changing the rack.')
             return False
-        if self.owner.engine.stream:
+        if self.owner.engine.stream or self.owner.engine.external:
             self.status.setText('Stop audio before changing the rack structure.')
             return False
         return True

@@ -40,7 +40,7 @@ class MotionDialog(QDialog):
                 self.table.setItem(row, column, QTableWidgetItem(str(value)))
 
     def start(self, mode):
-        if not self.owner.engine.stream or self.owner.rehearse.isChecked():
+        if (not self.owner.engine.stream and not self.owner.engine.external) or self.owner.rehearse.isChecked():
             self.status.setText('Start audio and leave rehearsal mode before recording or playing a score.')
             return
         if self.owner.plugin_dialog.learner or self.owner.engine.rack.editor_open:
@@ -54,13 +54,14 @@ class MotionDialog(QDialog):
     def stop(self):
         self.score.stop()
         self.owner.midi.panic()
+        self.owner.engine.instrument.panic()
         self.refresh()
         self.status.setText('Stopped. MIDI notes released.')
 
     def tick(self):
         if self.score.mode == 'Stopped':
             return
-        if not self.owner.engine.stream:
+        if (not self.owner.engine.stream and not self.owner.engine.external):
             self.stop()
             return
         clock = self.owner.engine.clock

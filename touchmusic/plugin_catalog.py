@@ -20,8 +20,8 @@ CATALOG = [
     ('ChowMatrix', 'Multi-tap delay', 'BSD-3-Clause', 'https://github.com/Chowdhury-DSP/ChowMatrix'),
     ('BYOD', 'Modular distortion', 'GPL-3.0', 'https://github.com/Chowdhury-DSP/BYOD'),
     ('MFreeFXBundle', 'Effects bundle', 'Proprietary free edition', 'https://www.meldaproduction.com/MFreeFXBundle'),
-    ('Surge XT', 'Instrument (planned)', 'GPL-3.0', 'https://github.com/surge-synthesizer/surge'),
-    ('Cardinal', 'Modular instrument (planned)', 'GPL-3.0', 'https://github.com/DISTRHO/Cardinal'),
+    ('Surge XT', 'Instrument candidate', 'GPL-3.0', 'https://github.com/surge-synthesizer/surge'),
+    ('Cardinal', 'Modular instrument candidate', 'GPL-3.0', 'https://github.com/DISTRHO/Cardinal'),
 ]
 
 # SHA256 observed from a developer-hosted archive, not an independent publisher signature.
