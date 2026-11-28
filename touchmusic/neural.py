@@ -13,16 +13,17 @@ import time
 from types import SimpleNamespace
 import numpy as np
 from .library import ROOT, DATA, read_audio
+from .runtime import VENDOR
 
 
 class SeedSingingBackend:
     def __init__(self, progress=print):
+        if not (VENDOR / 'inference.py').exists():
+            raise RuntimeError('Singing engine needs setup. Run touchmusic --setup-ai or Setup.cmd.')
         progress('Initializing PyTorch')
         import torch
         from huggingface_hub import hf_hub_download
-        vendor = ROOT / 'vendor' / 'seed-vc'
-        if not (vendor / 'inference.py').exists():
-            raise RuntimeError('Seed-VC source is missing. Run Setup.cmd.')
+        vendor = VENDOR
         sys.path.insert(0, str(vendor))
         spec = importlib.util.spec_from_file_location('touchmusic_seed', vendor / 'inference.py')
         module = importlib.util.module_from_spec(spec)

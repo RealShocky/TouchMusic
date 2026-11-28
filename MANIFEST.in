@@ -1,0 +1,6 @@
+include Launch.cmd Setup.cmd prepare_seed.py requirements.txt THIRD_PARTY_NOTICES.md
+recursive-include touchmusic *.txt
+prune data
+prune vendor
+prune tests
+prune docs

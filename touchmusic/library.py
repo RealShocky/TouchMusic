@@ -8,8 +8,7 @@ import soundfile as sf
 from scipy.signal import resample_poly
 from math import gcd
 
-ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / 'data'
+from .runtime import ROOT, DATA
 
 
 def save_json(path, value):

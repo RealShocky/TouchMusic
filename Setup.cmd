@@ -8,6 +8,8 @@ if errorlevel 1 goto failed
 if errorlevel 1 goto failed
 .venv\Scripts\python.exe -m pip install --no-cache-dir --keyring-provider disabled -r requirements.txt
 if errorlevel 1 goto failed
+.venv\Scripts\python.exe -m pip install --no-deps -e .
+if errorlevel 1 goto failed
 if not exist "vendor\seed-vc\inference.py" git clone https://github.com/Plachtaa/seed-vc.git vendor\seed-vc
 if errorlevel 1 goto failed
 git -C vendor\seed-vc checkout 51383efd921027683c89e5348211d93ff12ac2a8

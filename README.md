@@ -5,6 +5,7 @@
 ![Standalone](https://img.shields.io/badge/app-standalone-559C80)
 ![Local AI](https://img.shields.io/badge/voice_conversion-local-7958A6)
 ![Status](https://img.shields.io/badge/status-experimental-D59C37)
+[![Latest release](https://img.shields.io/github/v/release/RealShocky/TouchMusic)](https://github.com/RealShocky/TouchMusic/releases/latest)
 
 **Perform live with your voice, switch characters with hand gestures, and build layered loops.**
 
@@ -26,6 +27,28 @@ TouchMusic combines microphone effects, pitch correction, webcam hand tracking, 
 | Vocal character | Chord-following harmonies, vocal-range selection, vibrato preservation, formant shifting |
 | Sessions | Portable skits with completed loops, backing, voice references, settings, scenes, and mappings |
 | Recording | Performance WAV, separate stems, optional automatic vocal and mix alignment |
+| MIDI output | Gesture CC, notes, chords, velocity, channel, timed note release, all-notes-off |
+
+## Download or install
+
+Download the Windows setup ZIP from [Releases](https://github.com/RealShocky/TouchMusic/releases/latest), extract it, run Setup.cmd once, then Launch.cmd. Python 3.11 and Git are required. Setup downloads the runtime.
+
+The release also includes an installable wheel. With Python 3.11, install it directly:
+
+    py -3.11 -m pip install https://github.com/RealShocky/TouchMusic/releases/download/v0.1.0/touchmusic-0.1.0-py3-none-any.whl
+    touchmusic
+
+For character conversion, run the optional engine setup once:
+
+    touchmusic --setup-ai
+
+Use **touchmusic --setup-ai --cpu** for CPU wheels. The standard setup selects NVIDIA CUDA wheels.
+
+After publication to PyPI, the equivalent package command is:
+
+    py -3.11 -m pip install touchmusic
+
+The base package contains desktop effects, camera gestures, pitch correction, loops, and MIDI. The singing engine and model downloads are installed separately. **touchmusic --help** lists launch and setup options.
 
 ## Requirements
 
@@ -171,7 +194,13 @@ For an existing performance, import the WAV mix or separate stems into FL Studio
 
 ### Gesture control and plugin support
 
-Gesture-to-MIDI output is a planned extension. It would send MIDI CC and notes through a virtual MIDI port for FL Studio's Link to controller workflow and instrument control. TouchMusic currently controls its own effects and chords. VST3 hosting would require a separate plugin implementation.
+Open **MIDI / FL** in TouchMusic. Create a virtual port with [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html), click Refresh ports, select that port and channel, then Connect MIDI. Enable the same input in FL Studio's MIDI settings. **Test C4** checks the connection.
+
+In Gesture mapping, map continuous hand movements to **MIDI CC 0–119** and poses to **MIDI note C4–B4**, **MIDI chord**, or **MIDI chord I–VII**. The chord actions use the selected song key and scale. Set note velocity and length in MIDI / FL. **Map hand heights to CC 1 / 74** provides a quick starting point.
+
+Arm gestures to send. Rehearsal previews actions. Disarming sends all-notes-off. MIDI output disconnects when the app closes. Timed note release prevents a pose from leaving its notes held indefinitely. The all-notes-off button is also available manually. Connections are selected explicitly after launching the app.
+
+To link a plugin knob in FL Studio, right-click it, choose Link to controller, and move the mapped hand. MIDI transports control messages. Use the audio route above for vocals. Native TouchMusic VST3 hosting would require a separate plugin implementation.
 
 Official references are [FL Studio audio settings](https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/envsettings_audio.htm), [audio recording](https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/recording_audio.htm), and [external controller linking](https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/automation_linking.htm).
 
@@ -191,6 +220,24 @@ Official references are [FL Studio audio settings](https://www.image-line.com/fl
 | data/settings.json | Devices, effects, scenes, and mappings |
 | data/recordings/ | Default recording folder |
 | data/touchmusic.log | Startup and runtime diagnostics |
+
+Source-folder launches keep data beside the source. A wheel installation uses **%LOCALAPPDATA%/TouchMusic** on Windows. **TOUCHMUSIC_DATA_DIR** can override the data directory. Imported voices and models are excluded from the package.
+
+## Publishing a release
+
+Bump the version in pyproject.toml and touchmusic/runtime.py, update release-notes.md, then push to main. The release workflow builds a wheel, source distribution, Windows setup ZIP, and SHA-256 checksums and publishes a GitHub release. The same version is kept immutable on reruns.
+
+For the first PyPI publication, add a pending trusted publisher in your PyPI account:
+
+| PyPI field | Value |
+| --- | --- |
+| Project name | touchmusic |
+| Owner | RealShocky |
+| Repository | TouchMusic |
+| Workflow | release.yml |
+| Environment | pypi |
+
+After configuring it, open the repository Actions tab, select Build and release TouchMusic, choose Run workflow, and enable **publish_pypi**. Setting the repository variable **PYPI_PUBLISH** to **true** enables publication on subsequent version builds. The publisher uses short-lived GitHub OIDC authentication.
 
 This repository contains source and setup files. User audio, model weights, recordings, settings, upstream checkout, and the Python environment are generated locally and ignored by Git. Screenshots can be added under docs/screenshots/ and embedded here.
 

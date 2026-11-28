@@ -1,0 +1,12 @@
+torch==2.11.0
+torchaudio==2.11.0
+torchvision==0.26.0
+transformers==4.46.3
+huggingface-hub==0.36.0
+accelerate>=0.34,<2
+munch==4.0.0
+einops>=0.8,<0.9
+hydra-core>=1.3,<1.4
+pyyaml>=6,<7
+python-dotenv>=1,<2
+librosa>=0.10,<0.12

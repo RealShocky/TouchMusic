@@ -21,13 +21,15 @@ from .project import load_project, save_project
 from .transport import BEATS_PER_BAR, QUANTIZE
 from .vocal import HARMONY_MODES, VOCAL_RANGES
 from .reference_picker import ReferencePicker
+from .midi import MidiOutput, MIDI_ACTIONS, MIDI_CHORDS, MIDI_LEVELS, MIDI_NOTES
+from .midi_dialog import MidiDialog
 
 EFFECT_TARGETS = ['None', 'Reverb', 'Delay', 'Harmony', 'Robot', 'Pitch', 'Gain',
                   'Chorus', 'Drive', 'Radio', 'Octave', 'Tremolo', 'Warmth',
                   'Brightness', 'Gate', 'Feedback', 'Delay time', 'AI mix',
                   'Track level', 'Master level', 'Tune strength', 'Retune speed', 'Chord level',
                   'Formant', 'Vibrato',
-                  *(f'Loop {i} level' for i in range(1, LOOP_COUNT + 1))]
+                  *(f'Loop {i} level' for i in range(1, LOOP_COUNT + 1)), *MIDI_LEVELS]
 VOICE_SLOTS = [f'Voice {number}' for number in range(1, 6)]
 BUILTIN_PRESETS = {
     'Clean': {}, 'Space': {'reverb': 65, 'delay': 35},
@@ -49,7 +51,7 @@ ACTIONS = ['None', *VOICE_SLOTS, 'Next voice', 'Previous voice', 'Loop', *LOOP_A
            'Next loop', 'Previous loop', 'Mute output', 'AI conversion', 'Dialogue mode',
            'Play / pause track', 'Restart track', 'Record performance', *BUILTIN_PRESETS,
            *CHORD_ACTIONS, 'Next chord', 'Previous chord', 'Toggle chords', 'Toggle Auto-Tune',
-           'Toggle dry monitoring', 'Undo selected loop', 'Toggle metronome', 'Tap tempo']
+           'Toggle dry monitoring', 'Undo selected loop', 'Toggle metronome', 'Tap tempo', *MIDI_ACTIONS]
 EFFECT_DEFAULTS = {'gain': 70, 'aimix': 100, 'delaytime': 300, 'feedback': 29}
 TARGET_KEYS = {'AI mix': 'aimix', 'Delay time': 'delaytime', 'Master level': 'master',
                'Tune strength': 'tune', 'Retune speed': 'retune', 'Chord level': 'chord_level'}
@@ -123,6 +125,7 @@ class MainWindow(QMainWindow):
         DATA.mkdir(parents=True, exist_ok=True)
         self.library = VoiceLibrary()
         self.engine = AudioEngine()
+        self.midi = MidiOutput()
         self.camera = None
         self.closing = False
         self.last_pinch = {}
@@ -158,6 +161,7 @@ class MainWindow(QMainWindow):
         self.button('Open skit', self.open_skit, header)
         self.button('Save skit', self.save_skit, header)
         self.button('Music tools', self.open_music_tools, header)
+        self.button('MIDI / FL', self.open_midi_dialog, header)
         self.audio_button = self.button('Start audio', self.toggle_audio, header)
         self.audio_button.setObjectName('startAudio')
         self.mute_button = self.button('Mute output', self.toggle_mute, header, True)
@@ -200,6 +204,7 @@ class MainWindow(QMainWindow):
         self.camera_index.setFixedWidth(60)
         camera_row.addWidget(self.camera_index)
         self.arm = QCheckBox('Arm gestures')
+        self.arm.toggled.connect(lambda armed: self.midi.panic() if not armed else None)
         camera_row.addWidget(self.arm)
         self.rehearse = QCheckBox('Rehearse gestures')
         camera_row.addWidget(self.rehearse)
@@ -353,6 +358,8 @@ class MainWindow(QMainWindow):
         layout.addLayout(meters)
         self.build_music_tools(pitch_layout)
         pitch_layout.addStretch()
+        self.midi_dialog = MidiDialog(self.midi, self.settings.get('midi', {}), self)
+        self.midi_dialog.finished.connect(self.save_settings)
         self.apply_music(self.settings.get('music', {}))
         self.refresh_devices()
         self.refresh_voices()
@@ -530,6 +537,11 @@ class MainWindow(QMainWindow):
         self.music_dialog.show()
         self.music_dialog.raise_()
 
+    def open_midi_dialog(self):
+        self.midi_dialog.refresh()
+        self.midi_dialog.show()
+        self.midi_dialog.raise_()
+
     def map_left_chords(self):
         for index, action in enumerate(CHORD_ACTIONS[:5], 1):
             self.mappings[f'Left_{index}'].setCurrentText(action)
@@ -645,6 +657,7 @@ class MainWindow(QMainWindow):
             if key in self.sliders and type(value) is int:
                 self.sliders[key].setValue(value)
         self.apply_music(saved.get('music', {}))
+        self.midi_dialog.apply_settings(saved.get('midi', {}))
         if isinstance(saved.get('dialogue'), bool):
             self.dialogue.setChecked(saved['dialogue'])
         if type(saved.get('track_level')) is int:
@@ -701,6 +714,7 @@ class MainWindow(QMainWindow):
             'track_level': self.track_volume.value(),
             'loop_levels': [round(track.gain * 100) for track in self.engine.loops],
             'music': music,
+            'midi': self.midi_dialog.settings(),
         }
 
     def save_skit(self):
@@ -1003,6 +1017,9 @@ class MainWindow(QMainWindow):
     def gesture_level(self, target, value):
         if self.rehearse.isChecked():
             return
+        if target.startswith('MIDI CC '):
+            self.midi.control(int(target.removeprefix('MIDI CC ')), value)
+            return
         if target == 'Track level':
             slider = self.track_volume
         elif target.startswith('Loop ') and target.endswith(' level'):
@@ -1055,7 +1072,15 @@ class MainWindow(QMainWindow):
         if self.rehearse.isChecked():
             self.gesture_preview.setText(f'{pose} would trigger {action}' if action != 'None' else f'{pose} is unassigned')
             return
-        if action in self.voice_slots:
+        if action in MIDI_ACTIONS:
+            if action == 'MIDI panic':
+                self.midi.panic()
+            else:
+                p = self.engine.params
+                notes = [MIDI_NOTES[action]] if action in MIDI_NOTES else [
+                    note + 48 for note in chord_notes(p['key'], p['scale'], MIDI_CHORDS.get(action, p['chord']))]
+                self.midi.play(notes, self.midi_dialog.velocity.value(), self.midi_dialog.length.value() / 1000)
+        elif action in self.voice_slots:
             voice = self.voice_slots[action].currentData()
             index = self.voice_combo.findData(voice) if voice is not None else -1
             if index >= 0:
@@ -1165,6 +1190,9 @@ class MainWindow(QMainWindow):
             self.notice.setText(f'Recording saved. Dropped audio blocks: {recorder.dropped}.')
 
     def tick(self):
+        self.midi.tick()
+        if self.midi.error:
+            self.midi_dialog.update_status()
         for recorder in self.pending_exports[:]:
             if not recorder.alignment_thread.is_alive():
                 self.pending_exports.remove(recorder)
@@ -1253,6 +1281,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.timer.stop()
+        self.midi.close()
         self.engine.stop()
         if self.camera:
             self.closing = True
