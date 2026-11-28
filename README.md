@@ -237,7 +237,7 @@ For the first PyPI publication, add a pending trusted publisher in your PyPI acc
 | Workflow | release.yml |
 | Environment | pypi |
 
-After configuring it, open the repository Actions tab, select Build and release TouchMusic, choose Run workflow, and enable **publish_pypi**. Setting the repository variable **PYPI_PUBLISH** to **true** enables publication on subsequent version builds. The publisher uses short-lived GitHub OIDC authentication.
+After configuring it, version builds on main publish automatically. You can also open Actions, select Build and release TouchMusic, choose Run workflow, and enable **publish_pypi**. Reruns reuse the exact Python distributions attached to the existing GitHub release. The publisher uses short-lived GitHub OIDC authentication.
 
 This repository contains source and setup files. User audio, model weights, recordings, settings, upstream checkout, and the Python environment are generated locally and ignored by Git. Screenshots can be added under docs/screenshots/ and embedded here.
 
