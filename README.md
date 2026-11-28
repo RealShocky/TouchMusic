@@ -73,12 +73,15 @@ Music tools also contains vocal range, vibrato preservation, harmony mode, and f
 
 ## Character voices
 
-1. Click **Import audio** and choose WAV, MP3, FLAC, or OGG.
-2. Select the new voice in the **Character voice** dropdown. Importing preserves your previous selection.
-3. Click **Load singing engine** and wait until it reports ready.
-4. Enable **Use AI character conversion**, start audio, and speak or sing.
+1. Click **Import audio** and choose WAV, MP3, FLAC, or OGG. The reference picker opens with a player and waveform.
+2. Listen with **Play song**, seek with the full-track slider, and click **Use playhead as start** when you find a section. Drag the green selection or either edge to choose 1–8 seconds. Zoom and the waveform scrollbar let you work through longer songs. **Play selection** auditions the highlighted section, and **Loop selection** repeats it.
+3. Enter a voice name and click **Use this section**. TouchMusic saves the selected audio and selects the new reference in the voice list.
+4. Click **Load singing engine** and wait until it reports ready.
+5. Enable **Use AI character conversion**, start audio, and speak or sing.
 
-References must contain at least one second of audio. The engine uses the first eight seconds. Use a clean solo voice and trim the lead-in. WAV preserves the source best, and MP3 is supported.
+The engine uses up to eight seconds. The picker saves exactly the chosen section as the reference, so it can come from anywhere in a whole song. Earlier imports still use their first eight seconds. Use clear solo vocals with minimal instruments. The picker extracts the selected section as supplied. WAV preserves the source best, and MP3 is supported.
+
+Preview output and volume can be chosen inside the picker. It plays through its own player and works while the main audio engine is stopped. Use headphones while auditioning if the main microphone is active.
 
 Preview plays the reference. AI mix blends time-aligned dry and converted samples. Results depend on the reference, performance, and model. Importing a short reference does not train a dedicated model.
 
@@ -150,6 +153,27 @@ Record separate WAV stems creates a folder beside the mix with dry mic, wet voca
 Export aligned vocal and mix generates wet-vocal-aligned.wav and performance-aligned.wav after stopping. Converted samples return to their originating microphone times. The original mix and stems remain available.
 
 Alignment accounts for neural transport and the active formant buffer. Missing converted audio remains silent. It cannot recover samples arriving after recording stops. Other effect delays and tails can remain. The aligned mix uses the master level at stop instead of replaying master automation.
+
+## Using TouchMusic with FL Studio
+
+### Live audio route
+
+TouchMusic already offers a selectable output device. A virtual audio cable can carry that output into an FL Studio Mixer input.
+
+1. Install a virtual cable such as [VB-CABLE](https://vb-audio.com/Cable/) using its vendor instructions.
+2. In TouchMusic, keep your microphone selected and choose **CABLE Input** as the output using the same Windows audio backend as the microphone. Choose **Wet vocal** monitoring to send the converted/effected sound.
+3. In FL Studio's Audio settings, select **FL Studio ASIO** and open its panel. Choose **CABLE Output** as input and your headphones as output.
+4. Select the available external input on an FL Mixer insert. Monitor it and arm it for recording. FL Studio Producer Edition or higher supports external audio recording.
+
+This sends TouchMusic's monitored mix, including loops and backing if playing. Disable TouchMusic's metronome if you want the click excluded from this route. The AI engine's processing delay also reaches FL Studio. This routing requires configuring the virtual driver and has not been verified on every device.
+
+For an existing performance, import the WAV mix or separate stems into FL Studio. The aligned export can help place the converted vocal against the backing track.
+
+### Gesture control and plugin support
+
+Gesture-to-MIDI output is a planned extension. It would send MIDI CC and notes through a virtual MIDI port for FL Studio's Link to controller workflow and instrument control. TouchMusic currently controls its own effects and chords. VST3 hosting would require a separate plugin implementation.
+
+Official references are [FL Studio audio settings](https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/envsettings_audio.htm), [audio recording](https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/recording_audio.htm), and [external controller linking](https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/automation_linking.htm).
 
 ## Files and local data
 

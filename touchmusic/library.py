@@ -38,8 +38,28 @@ class VoiceLibrary:
         self.manifest = self.directory / 'library.json'
         self.voices = json.loads(self.manifest.read_text('utf-8')) if self.manifest.exists() else []
 
-    def import_file(self, source, name=None):
-        audio = read_audio(source, 24000)
+    def import_file(self, source, name=None, *, start_seconds=None, duration_seconds=None):
+        if start_seconds is None and duration_seconds is None:
+            audio = read_audio(source, 24000)
+        else:
+            start = float(start_seconds or 0)
+            duration = float(duration_seconds) if duration_seconds is not None else 8.
+            if not np.isfinite([start, duration]).all() or start < 0 or not 1-1e-6 <= duration <= 8+1e-6:
+                raise ValueError('Select between 1 and 8 seconds within the audio file.')
+            duration = min(8., max(1., duration))
+            with sf.SoundFile(str(source)) as stream:
+                begin = round(start * stream.samplerate)
+                count = round(duration * stream.samplerate)
+                if begin + count > stream.frames:
+                    raise ValueError('The selected section extends beyond the audio file.')
+                stream.seek(begin)
+                audio = stream.read(count, dtype='float32', always_2d=True).mean(axis=1)
+                original_rate = stream.samplerate
+            if not np.isfinite(audio).all():
+                raise ValueError('The selected section contains invalid samples.')
+            factor = gcd(original_rate, 24000)
+            if original_rate != 24000:
+                audio = resample_poly(audio, 24000 // factor, original_rate // factor).astype(np.float32)
         if len(audio) < 24000:
             raise ValueError('Choose a reference at least one second long.')
         if np.max(np.abs(audio)) < .0001:

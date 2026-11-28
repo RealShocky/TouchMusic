@@ -20,6 +20,7 @@ from .music import DEGREES, NOTES, SCALES, chord_name, chord_notes
 from .project import load_project, save_project
 from .transport import BEATS_PER_BAR, QUANTIZE
 from .vocal import HARMONY_MODES, VOCAL_RANGES
+from .reference_picker import ReferencePicker
 
 EFFECT_TARGETS = ['None', 'Reverb', 'Delay', 'Harmony', 'Robot', 'Pitch', 'Gain',
                   'Chorus', 'Drive', 'Radio', 'Octave', 'Tremolo', 'Warmth',
@@ -863,12 +864,22 @@ class MainWindow(QMainWindow):
     def import_voice(self):
         paths, _ = QFileDialog.getOpenFileNames(self, 'Import reference voices', '', 'Audio (*.wav *.mp3 *.flac *.ogg)')
         errors = []
+        imported = None
         for path in paths:
             try:
-                self.library.import_file(path)
+                picker = ReferencePicker(path, self)
+                if picker.exec() == QDialog.Accepted:
+                    imported = self.library.import_file(
+                        path, picker.name.text().strip(), start_seconds=picker.waveform.start,
+                        duration_seconds=picker.waveform.end - picker.waveform.start)
+                picker.deleteLater()
             except Exception as exc:
                 errors.append(f'{Path(path).name}: {exc}')
         self.refresh_voices()
+        if imported:
+            self.voice_combo.setCurrentIndex(self.voice_combo.findData(imported['id']))
+            self.notice.setText(f"Selected {imported['name']} · {imported['seconds']} s reference. "
+                                'Load the singing engine and enable AI conversion to use it.')
         if errors:
             self.error('\n'.join(errors))
 
