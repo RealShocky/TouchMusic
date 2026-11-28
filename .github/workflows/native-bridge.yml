@@ -1,0 +1,29 @@
+name: Native VST3 bridge checks
+on:
+  push:
+    paths: ['native/**', '.github/workflows/native-bridge.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure VST3 SDK and plugin
+        run: cmake -S native/control_bridge -B native-build -A x64 -DSMTG_RUN_VST_VALIDATOR=ON
+      - name: Build and validate plugin
+        run: cmake --build native-build --config Release --target TouchMusicControlBridge --parallel 4
+      - name: Package native bridge
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem native-build -Recurse -Directory -Filter 'TouchMusic Control Bridge.vst3' | Select-Object -First 1
+          if (-not $bundle) { throw 'VST3 bundle was not built' }
+          New-Item -ItemType Directory -Path native-package | Out-Null
+          Copy-Item -LiteralPath $bundle.FullName -Destination native-package -Recurse
+          Copy-Item native/control_bridge/STEINBERG-LICENSE.txt native-package/
+          Compress-Archive -Path native-package/* -DestinationPath TouchMusic-Control-Bridge-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: touchmusic-native-windows
+          path: TouchMusic-Control-Bridge-Windows.zip
