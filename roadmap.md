@@ -12,7 +12,7 @@ Updated 2026-11-28. This is the single requirements and delivery tracker. It sup
 
 Priority P0 is stability and compatibility, P1 is production functionality, P2 is expansion. Windows x64 is the supported platform. Python portability does not establish macOS/Linux support.
 
-Current automated checkpoint: **136 Python tests**, **94 native SDK checks across two bridges**, actual native host/control transport, package metadata and installed GUI/worker startup passed. [Evidence](docs/verification/development-checks.json). These are software checks, not microphone/camera/DAW validation.
+Current automated checkpoint: **139 Python tests**, **94 native SDK checks across two bridges**, actual native host/control transport, package metadata and installed GUI/worker startup passed. [Evidence](docs/verification/development-checks.json). These are software checks, not microphone/camera/DAW validation.
 
 The published baseline is **v0.4.0**. **v0.5.0 is in development, not released or production certified.** The ten requested v0.5.0 capabilities below are the release scope. A partial implementation does not satisfy that release gate.
 
@@ -77,7 +77,7 @@ The published baseline is **v0.4.0**. **v0.5.0 is in development, not released o
 | P11 | P1 | loopMIDI and VB-CABLE guided options | Planned | Document optional routes with official links and explain when interface loopback/existing ports suffice. Never promise audio transfer over MIDI. |
 | P12 | P1 | Pitch-preserving loop tempo follow | Planned | Prepare stretching outside callback; maintain beat alignment across tempo/transport changes without changing vocal pitch. |
 | P13 | P1 | Separate vocal/loop/backing outputs | Planned | Driver channel mapping, explicit monitor/record buses, saved routing and verified multi-output behavior. |
-| P14 | P1 | Compact/scalable performance layouts | Planned | Test supported resolutions/Windows scaling, accessible labels, keyboard navigation and essential control visibility. Current sidebar/workspaces retained. |
+| P14 | P1 | Compact/scalable performance layouts | Planned | Test supported resolutions/Windows scaling, accessible labels, keyboard navigation and essential control visibility. Current sidebar/workspaces retained. Corrupted punctuation repaired across UI labels with legacy scene action migration and Unicode-name regression coverage; scaling/accessibility checks remain. |
 | P15 | P1 | Character ensemble and dialogue/duet scenes | Planned | Offline dual conversion first; independent levels/stems; measure GPU/memory before promising live two-character AI. |
 | P16 | P1 | Signed installers and downloadable package release | In Progress | Existing setup ZIP, wheel, sdist, hashes, GitHub release and PyPI trusted publishing retained. Add signing/provenance and clean-install verification. No v0.5.0 release before its gates. |
 | P17 | P1 | macOS/Linux | Planned | Camera/audio backends, singing runtime, native host, packaging and platform CI/hardware evidence. Catalog portability is not app support. |

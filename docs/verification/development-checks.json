@@ -1,7 +1,7 @@
 {
   "snapshot": "0.5.0.dev3",
   "python_tests": {
-    "passed": 136,
+    "passed": 139,
     "failed": 0,
     "scope": "Automated behavior, injected device failures and offscreen Qt"
   },
@@ -51,5 +51,11 @@
     "commit": "fb948faa9a562f16793acd0844e62d9dd380fa15",
     "run": "https://github.com/RealShocky/TouchMusic/actions/runs/46154285705",
     "result": "Native rebuild passed; focus handoff test failed on working Windows named pipes. Replaced transient socket signaling with persistent bounded marker and added sender-exit regression."
-  }
+  },
+  "last_clean_runner_check": {
+    "commit": "a797b43107a93d11d3946ecf663f218b3beb58ca",
+    "run": "https://github.com/RealShocky/TouchMusic/actions/runs/46154688884",
+    "result": "136 tests, reviewed native plugin probes, native rebuild/hosting and package build passed; stable/PyPI publication skipped as intended. Subsequent UI label fix adds three local regressions; new CI follows."
+  },
+  "ui_labels": "Plain punctuation restored; Unicode user names retained; legacy scene mappings, macros and scores migrate and pass GUI regression."
 }

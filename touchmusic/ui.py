@@ -78,7 +78,7 @@ TARGET_KEYS = {'AI mix': 'aimix', 'Delay time': 'delaytime', 'Master level': 'ma
 MUSIC_TARGETS = {'Tempo': 'bpm', 'Overdub feedback': 'overdub_feedback', 'Loop edge fade': 'seam_ms',
                  'Count-in bars': 'count_in', 'Capture length': 'capture_bars', 'Song key': 'key',
                  'Chord selection': 'chord'}
-SCENE_PREFIX = 'Scene ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· '
+from .text_labels import SCENE_PREFIX, saved_labels
 
 STYLE = '''
 QMainWindow, QWidget { background: #14191c; color: #f3f1e9; font-family: 'Segoe UI'; font-size: 13px; }
@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
         self.settings = {}
         if self.settings_path.exists():
             try:
-                self.settings = json.loads(self.settings_path.read_text('utf-8'))
+                self.settings = saved_labels(json.loads(self.settings_path.read_text('utf-8')))
             except (ValueError, OSError):
                 pass
         self.saved_presets = self.settings.get('presets', {})
@@ -200,9 +200,9 @@ class MainWindow(QMainWindow):
         header.addStretch()
         session_button = QPushButton('Session')
         self.session_menu = QMenu(self)
-        self.session_menu.addAction('Open skitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦', self.open_skit)
-        self.session_menu.addAction('Save skitÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦', self.save_skit)
-        self.session_menu.addAction('SetlistÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦', self.open_setlist)
+        self.session_menu.addAction('Open skit...', self.open_skit)
+        self.session_menu.addAction('Save skit...', self.save_skit)
+        self.session_menu.addAction('Setlist...', self.open_setlist)
         self.session_menu.addAction('Stage view (F11)', self.open_stage)
         self.session_menu.addAction('Audio setup and diagnostics', self.open_audio_setup)
         self.session_menu.addAction('Gesture macros', self.open_macros)
@@ -728,11 +728,11 @@ class MainWindow(QMainWindow):
             self.music_controls[key] = box
             box.toggled.connect(lambda value, k=key: self.set_music(k, value))
             layout.addWidget(box)
-        help_text = QLabel('Map Chord IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“VII or Next chord in Gesture mapping. '
+        help_text = QLabel('Map Chord I-VII or Next chord in Gesture mapping. '
                            'Studio uses a longer buffer. Dry mic monitoring keeps the recorded mix wet.')
         help_text.setWordWrap(True)
         layout.addWidget(help_text)
-        self.button('Map left fingers 1ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“5 to chords IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“V', self.map_left_chords, layout)
+        self.button('Map left fingers 1-5 to chords I-V', self.map_left_chords, layout)
         self.button('Done', dialog.accept, layout)
         dialog.finished.connect(self.save_settings)
         self.music_dialog = dialog
@@ -756,7 +756,7 @@ class MainWindow(QMainWindow):
     def map_left_chords(self):
         for index, action in enumerate(CHORD_ACTIONS[:5], 1):
             self.mappings[f'Left_{index}'].setCurrentText(action)
-        self.notice.setText('Left fingers 1ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“5 now select chords IÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“V.')
+        self.notice.setText('Left fingers 1-5 now select chords I-V.')
 
     def toggle_rehearsal(self, active):
         self.gesture_preview.setText('Hold a mapped pose to preview its action.' if active else '')
@@ -871,6 +871,7 @@ class MainWindow(QMainWindow):
                     slider.setValue(BUILTIN_PRESETS[name].get(key, EFFECT_DEFAULTS.get(key, 0)))
 
     def apply_performance(self, saved):
+        saved = saved_labels(saved)
         if isinstance(saved.get('instrument'), dict):
             if self.engine.instrument.apply_values(saved['instrument']):
                 self.instrument_dialog.pending = None
@@ -1025,6 +1026,7 @@ class MainWindow(QMainWindow):
             return False
 
     def apply_session(self, settings, assets, voices):
+        settings = saved_labels(settings)
         if self.engine.stream or self.engine.external:
             self.toggle_audio()
         self.arm.setChecked(False)
@@ -1191,7 +1193,7 @@ class MainWindow(QMainWindow):
         self.voice_combo.clear()
         self.voices = self.library.voices
         for voice in self.voices:
-            self.voice_combo.addItem(f"{voice['name']}  ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·  {voice['seconds']} s", voice['id'])
+            self.voice_combo.addItem(f"{voice['name']}  |  {voice['seconds']} s", voice['id'])
         index = self.voice_combo.findData(selected)
         if index >= 0:
             self.voice_combo.setCurrentIndex(index)
@@ -1220,7 +1222,7 @@ class MainWindow(QMainWindow):
         self.refresh_voices()
         if imported:
             self.voice_combo.setCurrentIndex(self.voice_combo.findData(imported['id']))
-            self.notice.setText(f"Selected {imported['name']} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {imported['seconds']} s reference. "
+            self.notice.setText(f"Selected {imported['name']} | {imported['seconds']} s reference. "
                                 'Load the singing engine and enable AI conversion to use it.')
         if errors:
             self.error('\n'.join(errors))
@@ -1259,7 +1261,7 @@ class MainWindow(QMainWindow):
         self.engine.converter = StreamingConverter()
         self.engine.converter.set_quality(self.music_controls['quality'].currentText())
         self.model_button.setEnabled(False)
-        self.model_button.setText('Loading singing engineÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦')
+        self.model_button.setText('Loading singing engine...')
         self.select_voice()
 
     def toggle_ai(self, checked):
@@ -1276,7 +1278,7 @@ class MainWindow(QMainWindow):
         if self.camera:
             self.camera.stop()
             self.camera_button.setEnabled(False)
-            self.tracking.setText('Stopping cameraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦')
+            self.tracking.setText('Stopping camera...')
             self.arm.setChecked(False)
         else:
             self.camera = CameraWorker(self.camera_index.value())
@@ -1328,7 +1330,7 @@ class MainWindow(QMainWindow):
             detected.append(f'{hand} {pose}' if pose else hand)
         rehearsal = self.rehearse.isChecked()
         state = 'Rehearsal' if rehearsal else 'Armed' if self.arm.isChecked() else 'Disarmed'
-        self.tracking.setText(f"{state} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {', '.join(detected)}" if detected else f'{state} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Show your hands')
+        self.tracking.setText(f"{state} | {', '.join(detected)}" if detected else f'{state} | Show your hands')
         if not self.arm.isChecked() and not rehearsal:
             return
         for control in controls:
@@ -1756,7 +1758,7 @@ class MainWindow(QMainWindow):
             self.notice.setText('Recording failed: ' + recorder.error)
         elif recorder.alignment_thread:
             self.pending_exports.append(recorder)
-            self.notice.setText('Recording saved. Exporting aligned vocal and mixÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦')
+            self.notice.setText('Recording saved. Exporting aligned vocal and mix...')
         elif recorder.alignment_error:
             self.notice.setText('Recording saved. Alignment skipped: ' + recorder.alignment_error)
         else:
@@ -1822,14 +1824,14 @@ class MainWindow(QMainWindow):
                 state = ''
             if clip is not None and not loop.recording:
                 status += (' REV' if loop.reverse else '') + (f' {loop.speed:g}x' if loop.speed != 1 else '') + (' STUTTER' if loop.stutter_size else '')
-            pad.setText(f'Loop {index+1}  ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·  {status}')
+            pad.setText(f'Loop {index+1}  |  {status}')
             if pad.property('loopState') != state:
                 pad.setProperty('loopState', state)
                 pad.style().unpolish(pad)
                 pad.style().polish(pad)
             mute.setChecked(loop.muted)
         beat = self.engine.clock.beat
-        self.beat_status.setText(f'Bar {beat // BEATS_PER_BAR + 1} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Beat {beat % BEATS_PER_BAR + 1}'
+        self.beat_status.setText(f'Bar {beat // BEATS_PER_BAR + 1} | Beat {beat % BEATS_PER_BAR + 1}'
                                  if self.engine.stream else '4/4')
         converter = self.engine.converter
         if converter:
@@ -1858,13 +1860,13 @@ class MainWindow(QMainWindow):
                 pitch = 'Waiting for a sung note'
             else:
                 cents = self.engine.pitch_cents
-                pitch = f'{NOTES[detected % 12]} to {NOTES[target % 12]}  ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·  {cents:+d} cents from target'
+                pitch = f'{NOTES[detected % 12]} to {NOTES[target % 12]}  |  {cents:+d} cents from target'
         self.pitch_status.setText(pitch)
         self.pitch_meter.set_cents(cents)
         queued = self.engine.queued_chord
         chord_text = f'Chord {DEGREES[p["chord"]]} ({chord})'
         if queued is not None:
-            chord_text += f' ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ {DEGREES[queued]} queued'
+            chord_text += f' -> {DEGREES[queued]} queued'
         recording = '  |  Recording' if self.engine.recorder else ''
         audio = 'DAW audio' if self.engine.external else 'Audio on' if self.engine.stream else 'Audio off'
         gestures = 'Gestures armed' if self.arm.isChecked() else 'Gestures off'

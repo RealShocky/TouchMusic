@@ -178,6 +178,8 @@ class MotionDialog(QDialog):
             self.score.capture(kind, target, value)
 
     def checked_load(self, settings):
+        from .text_labels import score_labels
+        settings = score_labels(settings)
         from .ui import EFFECT_TARGETS, ACTIONS, SCENE_PREFIX
         MotionScore.validate(settings)
         for event in settings['events']:
