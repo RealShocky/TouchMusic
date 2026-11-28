@@ -53,3 +53,16 @@ def test_seam_fade_retains_clip_length_and_source():
     assert output[0] == 0 and output[-1] == 0
     assert output[500] == 1
     np.testing.assert_array_equal(loop.clip, original)
+def test_overdub_and_capture_commands_cancel_the_same_pending_count_in():
+    import numpy as np
+    from touchmusic.audio import AudioEngine
+    engine = AudioEngine()
+    engine.params['count_in'] = 1
+    engine.commands.put(('loop', 0))
+    engine.process(np.zeros(512, np.float32))
+    assert ('loop', 0) in engine.clock.pending
+    engine.commands.put(('overdub', 0))
+    engine.process(np.zeros(512, np.float32))
+    assert not engine.clock.pending
+    assert not engine.loop.recording
+

@@ -8,7 +8,7 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
+from PySide6.QtGui import QColor, QImage, QPainter, QPixmap, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QSlider, QFileDialog, QMessageBox, QInputDialog,
     QProgressBar, QCheckBox, QGroupBox, QGridLayout, QSpinBox, QDialog, QScrollArea, QTabWidget, QSizePolicy, QMenu)
@@ -25,12 +25,16 @@ from .midi import MidiOutput, MIDI_ACTIONS, MIDI_CHORDS, MIDI_LEVELS, MIDI_NOTES
 from .midi_dialog import MidiDialog
 from .sessions import SessionRecovery
 from .setlist_dialog import SetlistDialog
+from .precision import GesturePrecision
+from .precision_dialog import PrecisionDialog
+from .stage import StageView
 
 EFFECT_TARGETS = ['None', 'Reverb', 'Delay', 'Harmony', 'Robot', 'Pitch', 'Gain',
                   'Chorus', 'Drive', 'Radio', 'Octave', 'Tremolo', 'Warmth',
                   'Brightness', 'Gate', 'Feedback', 'Delay time', 'AI mix',
                   'Track level', 'Master level', 'Tune strength', 'Retune speed', 'Chord level',
-                  'Formant', 'Vibrato',
+                  'Formant', 'Vibrato', 'Tempo', 'Overdub feedback', 'Loop edge fade',
+                  'Count-in bars', 'Capture length', 'Song key', 'Chord selection',
                   *(f'Loop {i} level' for i in range(1, LOOP_COUNT + 1)), *MIDI_LEVELS]
 VOICE_SLOTS = [f'Voice {number}' for number in range(1, 6)]
 BUILTIN_PRESETS = {
@@ -54,10 +58,14 @@ ACTIONS = ['None', *VOICE_SLOTS, 'Next voice', 'Previous voice', 'Loop', *LOOP_A
            'Play / pause track', 'Restart track', 'Record performance', *BUILTIN_PRESETS,
            *CHORD_ACTIONS, 'Next chord', 'Previous chord', 'Toggle chords', 'Toggle Auto-Tune',
            'Toggle dry monitoring', 'Undo selected loop', 'Redo selected loop', 'Overdub selected loop',
-           'Next song', 'Previous song', 'Toggle metronome', 'Tap tempo', *MIDI_ACTIONS]
+           'Next song', 'Previous song', 'Toggle overdub mode', 'Next capture length', 'Next count-in',
+           'Freeze movements', 'Emergency mute', 'Toggle stage view', 'Toggle metronome', 'Tap tempo', *MIDI_ACTIONS]
 EFFECT_DEFAULTS = {'gain': 70, 'aimix': 100, 'delaytime': 300, 'feedback': 29}
 TARGET_KEYS = {'AI mix': 'aimix', 'Delay time': 'delaytime', 'Master level': 'master',
                'Tune strength': 'tune', 'Retune speed': 'retune', 'Chord level': 'chord_level'}
+MUSIC_TARGETS = {'Tempo': 'bpm', 'Overdub feedback': 'overdub_feedback', 'Loop edge fade': 'seam_ms',
+                 'Count-in bars': 'count_in', 'Capture length': 'capture_bars', 'Song key': 'key',
+                 'Chord selection': 'chord'}
 SCENE_PREFIX = 'Scene · '
 
 STYLE = '''
@@ -134,6 +142,9 @@ class MainWindow(QMainWindow):
         self.last_pinch = {}
         self.ai_requested = False
         self.music_controls = {}
+        self.precision = GesturePrecision()
+        self.calibrating_until = 0.
+        self.calibration_samples = {}
         self.last_tune = 80
         self.tempo_taps = []
         self.pending_exports = []
@@ -172,6 +183,9 @@ class MainWindow(QMainWindow):
         self.session_menu.addAction('Open skit…', self.open_skit)
         self.session_menu.addAction('Save skit…', self.save_skit)
         self.session_menu.addAction('Setlist…', self.open_setlist)
+        self.session_menu.addAction('Stage view (F11)', self.open_stage)
+        self.session_menu.addAction('Test output', self.test_output)
+        self.session_menu.addAction('Emergency mute (F12)', self.emergency_mute)
         self.session_menu.addSeparator()
         self.session_menu.addAction('Save recovery now', lambda: self.backup_session(force=True))
         self.recover_action = self.session_menu.addAction('Recover last session', self.restore_recovery)
@@ -231,6 +245,7 @@ class MainWindow(QMainWindow):
         camera_row.addWidget(self.camera_index)
         self.arm = QCheckBox('Arm gestures')
         self.arm.toggled.connect(lambda armed: self.midi.panic() if not armed else None)
+        self.arm.toggled.connect(lambda _: self.precision.reset())
         camera_row.addWidget(self.arm)
         self.rehearse = QCheckBox('Rehearse gestures')
         camera_row.addWidget(self.rehearse)
@@ -398,6 +413,10 @@ class MainWindow(QMainWindow):
         self.refresh_voices()
         if self.recovery_pending:
             self.notice.setText('An unfinished session has a recovery backup. Recover it or choose Use current session.')
+        self.stage_view = StageView(self)
+        self.panic_shortcut = QShortcut(QKeySequence('F12'), self)
+        self.panic_shortcut.setContext(Qt.ApplicationShortcut)
+        self.panic_shortcut.activated.connect(self.emergency_mute)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.timer.start(100)
@@ -440,6 +459,7 @@ class MainWindow(QMainWindow):
         tempo.setRange(40, 240)
         tempo.setValue(120)
         tempo.setSuffix(' BPM')
+        tempo.setToolTip('Schedules new captures and chord changes. Existing loop audio keeps its recorded speed.')
         tempo.setAccessibleName('Tempo')
         tempo.valueChanged.connect(lambda value: self.set_music('bpm', value))
         self.music_controls['bpm'] = tempo
@@ -680,7 +700,8 @@ class MainWindow(QMainWindow):
         dialog.setWindowTitle('Gesture mapping')
         dialog.setMinimumWidth(560)
         layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel('Arm gestures in the main window. Hold a pose for a quarter second.'))
+        layout.addWidget(QLabel('Arm gestures in the main window. Hold a pose for the configured duration.'))
+        self.button('Precision and calibration', self.open_precision, layout)
         grid = QGridLayout()
         grid.addWidget(QLabel('Pose or movement'), 0, 0)
         grid.addWidget(QLabel('Left hand'), 0, 1)
@@ -712,6 +733,9 @@ class MainWindow(QMainWindow):
         self.button('Done', dialog.accept, layout)
         dialog.finished.connect(self.save_settings)
         self.gesture_dialog = dialog
+        self.precision_dialog = PrecisionDialog(self)
+        self.precision_controls = self.precision_dialog.controls
+        self.precision_dialog.apply_settings(self.settings.get('gesture_precision', {}))
 
     def open_gesture_dialog(self):
         self.gesture_dialog.show()
@@ -748,6 +772,8 @@ class MainWindow(QMainWindow):
             if key in self.sliders and type(value) is int:
                 self.sliders[key].setValue(value)
         self.apply_music(saved.get('music', {}))
+        if 'gesture_precision' in saved:
+            self.precision_dialog.apply_settings(saved['gesture_precision'])
         self.midi_dialog.apply_settings(saved.get('midi', {}))
         if isinstance(saved.get('dialogue'), bool):
             self.dialogue.setChecked(saved['dialogue'])
@@ -806,6 +832,7 @@ class MainWindow(QMainWindow):
             'loop_levels': [round(track.gain * 100) for track in self.engine.loops],
             'music': music,
             'midi': self.midi_dialog.settings(),
+            'gesture_precision': self.precision_dialog.settings(),
         }
 
     def save_skit(self):
@@ -1100,6 +1127,7 @@ class MainWindow(QMainWindow):
             self.arm.setChecked(False)
         else:
             self.camera = CameraWorker(self.camera_index.value())
+            self.update_precision()
             self.camera.frame.connect(self.camera_frame)
             self.camera.controls.connect(self.gestures)
             self.camera.status.connect(self.tracking.setText)
@@ -1122,6 +1150,13 @@ class MainWindow(QMainWindow):
         self.camera_label.setPixmap(QPixmap.fromImage(image).scaled(self.camera_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     def gestures(self, controls):
+        if self.calibrating_until:
+            for control in controls:
+                hand = control['hand']
+                for axis, value in ((hand, control['y']), (hand + '_x', 1-control['x']),
+                                    (hand + '_span', control.get('span', 0))):
+                    self.calibration_samples.setdefault(axis, []).append(value)
+            return
         detected = []
         for control in controls:
             hand = control['hand']
@@ -1144,13 +1179,13 @@ class MainWindow(QMainWindow):
         for control in controls:
             hand = control['hand']
             for key, value in ((hand, control['y']), (hand + '_x', 1 - control['x'])):
-                self.gesture_level(self.mappings[key].currentText(), value)
+                self.precise_level(key, value)
             if 'span' in control:
-                self.gesture_level(self.mappings[hand + '_span'].currentText(), control['span'])
+                self.precise_level(hand + '_span', control['span'])
             now = time.monotonic()
             pinch_action = self.pinch_action(hand)
             if control.get('held') and pinch_action != 'None':
-                if control['pinch'] and now - self.last_pinch.get(hand, 0) > .6:
+                if control['pinch'] and now - self.last_pinch.get(hand, 0) > self.precision_controls['pinch_ms'].value() / 1000:
                     self.last_pinch[hand] = now
                     self.gesture_action(pinch_action, f'{hand} pinch')
                 continue
@@ -1158,6 +1193,101 @@ class MainWindow(QMainWindow):
                 count = control['pose']
                 pose_label = 'fist' if count == 0 else '1 finger' if count == 1 else f'{count} fingers'
                 self.gesture_action(self.mappings[f'{hand}_{count}'].currentText(), f'{hand} {pose_label}')
+
+    def update_precision(self, *_):
+        controls = self.precision_controls
+        self.precision.deadband = controls['deadband'].value() / 100
+        self.precision.sensitivity = controls['sensitivity'].value() / 100
+        self.precision.reset()
+        if self.camera:
+            self.camera.precision_options = {key: controls[key].value() for key in ('hold_ms', 'smoothing_ms')}
+
+    def open_precision(self):
+        self.precision_dialog.show()
+        self.precision_dialog.raise_()
+
+    def start_calibration(self):
+        if not self.camera:
+            self.precision_dialog.status.setText('Start the camera before calibrating.')
+            return
+        self.arm.setChecked(False)
+        self.calibration_samples = {}
+        self.calibrating_until = time.monotonic() + 5
+        self.precision_dialog.status.setText('Move both hands up, down, left and right; open and close thumb-index spread.')
+
+    def calibration_tick(self):
+        if not self.calibrating_until:
+            return
+        remaining = self.calibrating_until - time.monotonic()
+        if remaining > 0:
+            self.tracking.setText(f'Calibrating movement: {remaining:.1f} seconds. Gestures disarmed.')
+            return
+        count = self.precision.calibrate(self.calibration_samples)
+        self.calibrating_until = 0.
+        self.calibration_samples = {}
+        self.precision_dialog.status.setText(f'Calibrated {count} movement axes. '
+            + ('Arm gestures when ready.' if count else 'No sufficient movement detected. Previous ranges retained.'))
+        self.notice.setText(self.precision_dialog.status.text())
+        self.save_settings()
+
+    def precise_level(self, axis, value):
+        if self.precision_dialog.freeze.isChecked():
+            return
+        target = self.mappings[axis].currentText()
+        if target == 'None':
+            return
+        filtered = self.precision.map(axis, value, state_key=axis + ':' + target)
+        if filtered is None:
+            return
+        if self.rehearse.isChecked():
+            self.gesture_preview.setText(f'{axis} would set {target} to {self.movement_text(target, filtered)}')
+            return
+        self.gesture_level(target, filtered)
+        self.gesture_preview.setText(f'{axis}: {target} {self.movement_text(target, filtered)}')
+
+    def movement_text(self, target, value):
+        if target in MUSIC_TARGETS:
+            control = self.music_controls[MUSIC_TARGETS[target]]
+            if isinstance(control, QComboBox):
+                return control.itemText(min(control.count()-1, int(value * control.count())))
+            number = round(control.minimum() + value * (control.maximum()-control.minimum()))
+            return f'{number}{control.suffix()}'
+        if target.startswith('MIDI CC '):
+            return str(round(value * 127))
+        slider = self.sliders.get(TARGET_KEYS.get(target, target.lower()))
+        if slider is not None:
+            number = round(slider.minimum() + value * (slider.maximum()-slider.minimum()))
+            unit = ' st' if target in ('Pitch', 'Formant') else ' ms' if target == 'Delay time' else '%'
+            return f'{number}{unit}'
+        return f'{value:.0%}'
+
+    def emergency_mute(self):
+        self.mute_button.setChecked(True)
+        self.toggle_mute(True)
+        self.arm.setChecked(False)
+        self.midi.panic()
+        self.notice.setText('Output muted and gestures disarmed. Recording continues. Unmute when ready.')
+
+    def test_output(self):
+        if not self.engine.stream:
+            self.notice.setText('Start audio first, then Session > Test output. Set your speaker volume low.')
+            return
+        if self.engine.muted:
+            self.notice.setText('Output is muted. Unmute before testing output.')
+            return
+        self.engine.play_test_tone()
+        self.notice.setText('Playing a quiet 440 Hz test tone to the selected output. It is excluded from recordings.')
+
+    def stage_music_text(self):
+        params = self.engine.params
+        return (f'{NOTES[params["key"]]} {params["scale"]} | {params["bpm"]} BPM | '
+                f'Chord {DEGREES[params["chord"]]} | {self.beat_status.text()}')
+
+    def open_stage(self):
+        self.stage_view.refresh()
+        self.stage_view.show()
+        self.stage_view.raise_()
+        self.stage_view.activateWindow()
 
     def pinch_action(self, hand):
         return self.mappings['pinch' if hand == 'Right' else 'left_pinch'].currentText()
@@ -1167,6 +1297,15 @@ class MainWindow(QMainWindow):
             return
         if target.startswith('MIDI CC '):
             self.midi.control(int(target.removeprefix('MIDI CC ')), value)
+            return
+        if target == 'None':
+            return
+        if target in MUSIC_TARGETS:
+            control = self.music_controls[MUSIC_TARGETS[target]]
+            if isinstance(control, QComboBox):
+                control.setCurrentIndex(min(control.count()-1, int(value * control.count())))
+            else:
+                control.setValue(round(control.minimum() + value * (control.maximum() - control.minimum())))
             return
         if target == 'Track level':
             slider = self.track_volume
@@ -1220,6 +1359,8 @@ class MainWindow(QMainWindow):
         if self.rehearse.isChecked():
             self.gesture_preview.setText(f'{pose} would trigger {action}' if action != 'None' else f'{pose} is unassigned')
             return
+        if action != 'None':
+            self.gesture_preview.setText(f'{pose}: {action}')
         if action in MIDI_ACTIONS:
             if action == 'MIDI panic':
                 self.midi.panic()
@@ -1236,6 +1377,21 @@ class MainWindow(QMainWindow):
         elif action in ('Next voice', 'Previous voice') and self.voice_combo.count():
             step = 1 if action == 'Next voice' else -1
             self.voice_combo.setCurrentIndex((self.voice_combo.currentIndex() + step) % self.voice_combo.count())
+        elif action == 'Toggle overdub mode':
+            control = self.music_controls['loop_mode']
+            control.setCurrentIndex(1 - control.currentIndex())
+        elif action == 'Next capture length':
+            control = self.music_controls['capture_bars']
+            control.setCurrentIndex((control.currentIndex()+1) % control.count())
+        elif action == 'Next count-in':
+            control = self.music_controls['count_in']
+            control.setValue((control.value()+1) % 3)
+        elif action == 'Freeze movements':
+            self.precision_dialog.freeze.toggle()
+        elif action == 'Emergency mute':
+            self.emergency_mute()
+        elif action == 'Toggle stage view':
+            self.stage_view.hide() if self.stage_view.isVisible() else self.open_stage()
         elif action == 'Loop':
             self.toggle_loop()
         elif action == 'Undo selected loop':
@@ -1344,6 +1500,7 @@ class MainWindow(QMainWindow):
             self.notice.setText(f'Recording saved. Dropped audio blocks: {recorder.dropped}.')
 
     def tick(self):
+        self.calibration_tick()
         self.midi.tick()
         self.backup_session()
         if self.midi.error:
@@ -1435,14 +1592,19 @@ class MainWindow(QMainWindow):
                                   f"{chord_text}  |  {p['monitor']}  |  {audio}  |  {gestures}{recording}")
         if self.engine.error:
             self.notice.setText('Audio error: ' + self.engine.error)
+        if self.stage_view.isVisible():
+            self.stage_view.refresh()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Space:
+        if event.key() == Qt.Key_F11:
+            self.open_stage()
+        elif event.key() == Qt.Key_Space:
             self.mute_button.click()
         else:
             super().keyPressEvent(event)
 
     def closeEvent(self, event):
+        self.stage_view.hide()
         self.timer.stop()
         self.midi.close()
         self.engine.stop()

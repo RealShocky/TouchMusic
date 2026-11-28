@@ -14,6 +14,7 @@ class CameraWorker(QThread):
         super().__init__()
         self.index = index
         self.running = True
+        self.precision_options = {'hold_ms': 250, 'smoothing_ms': 90}
 
     def run(self):
         capture = None
@@ -38,6 +39,9 @@ class CameraWorker(QThread):
                     frame = cv2.flip(frame, 1)
                     result = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                     controls = []
+                    options = self.precision_options
+                    mapper.hold_seconds = options['hold_ms'] / 1000
+                    mapper.smoothing_seconds = options['smoothing_ms'] / 1000
                     seen = set()
                     for landmarks, handedness in zip(result.multi_hand_landmarks or [], result.multi_handedness or []):
                         hand = handedness.classification[0].label

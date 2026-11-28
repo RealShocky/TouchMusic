@@ -1,21 +1,22 @@
-# TouchMusic 0.2.0
+# TouchMusic 0.3.0
 
-Standalone performance and session upgrades.
+More expressive standalone gesture controls and a dedicated stage view.
 
-- Reference-quality reports and suggested 1-8 second sections, with manual audition and selection.
-- Loop overdubbing with adjustable feedback and four levels of committed-take undo/redo.
-- One- or two-bar count-in and exact 1/2/4/8-bar capture, including automatic stop.
-- Background recovery of completed loops, backing, voice references, and settings.
-- Ordered setlists with per-song skit recall and Next/Previous song gesture actions.
-- Optional loop-edge fades, progress bars, countdowns, and clearer capture status.
-- Preview media loads when auditioning, reducing unnecessary player work during reference analysis.
+- Five-second movement calibration, configurable pose hold and pinch cooldown, movement smoothing, sensitivity, and deadband.
+- Freeze continuous movement while keeping deliberate finger and pinch actions available.
+- Gesture control for tempo, key, chords, count-in, capture length, overdub feedback, and edge fades.
+- Large stage view with four loop pads, voice switching, recording, setlist navigation, and fullscreen.
+- F12 emergency mute disarms gestures and releases MIDI notes while preserving running recording and arrangement.
+- Monitoring-only output test tone for diagnosing silent playback.
+- Capture and overdub commands cancel the same pending count-in instead of leaving conflicting queued starts.
+- Precision and calibration settings persist in presets, skits, recovery, and app settings.
 
 ## Downloads
 
-The Windows Setup ZIP requires 64-bit Python 3.11 and Git. Extract, run Setup.cmd once, then Launch.cmd. Dependencies and the optional singing runtime download during setup. This is a setup archive, not a dependency-free executable.
+The Windows Setup ZIP requires Python 3.11 (64-bit) and Git. Extract, run Setup.cmd once, then Launch.cmd. It downloads dependencies and optional singing runtime; it is not a dependency-free executable.
 
-Alternatively: `py -3.11 -m pip install --upgrade touchmusic`, then run `touchmusic`. Install the optional character engine with `touchmusic --setup-ai`.
+Install or upgrade with `py -3.11 -m pip install --upgrade touchmusic`, then run `touchmusic`. Install the optional singing engine with `touchmusic --setup-ai`.
 
-Personal voices, recordings, model weights, and caches are excluded. Reference suggestions use level heuristics, not vocal isolation. Recovery excludes active capture and undo history. Setlist song recall stops audio and disarms gestures. Live FL Studio routing validation is pending.
+Personal voices, recordings, model weights, and caches are excluded. Existing loop audio does not change speed when BPM changes. Live camera, hardware-output and FL Studio validation remain pending. FL Studio testing is paused until reinstallation.
 
-Automated behavior tests, desktop layout checks, and package installation are checked for this release. SHA256SUMS.txt accompanies the release artifacts.
+72 automated tests passed. Desktop layouts and installed-wheel startup are checked for this release.

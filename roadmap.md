@@ -4,7 +4,7 @@ TouchMusic is a standalone vocal performance instrument with gesture control and
 
 ## Current baseline
 
-Version 0.2.0 adds standalone performance upgrades to the GitHub and PyPI distribution.
+Version 0.3.0 adds gesture precision, expanded mappings, stage view, and output diagnostics. Version 0.2.0 introduced overdubbing, timed capture, reference suggestions, recovery, and setlists.
 
 - Standalone desktop effects, pitch correction, voice references, and local AI conversion.
 - Reference-import player with waveform, zoom, and draggable 1–8 second selection.
@@ -22,8 +22,8 @@ Automated tests and package installation were verified during development. End-t
 | 1 | Connection wizard | A guided MIDI and audio setup with test note, audio meters, saved routing profiles, and explicit connection status | A fresh setup can verify MIDI messages and an audio round trip and report a missing route clearly |
 | 2 | Dedicated FL Studio controller profile | Gesture actions for transport, record, track selection, mixer controls, and plugin parameters through an FL controller script | Each action controls the intended FL function and provides feedback for the active target |
 | 3 | Shared tempo and transport | Select a clock master and make TouchMusic follow FL tempo, playback, and bar position | Capture and chord changes remain aligned during sustained playback and recover correctly after stop/restart |
-| 4 | Gesture calibration and precision | Calibrated movement range, adjustable sensitivity, dead zones, pose timing, and a visible parameter/action overlay | Deliberate gestures work consistently while small incidental movement avoids unwanted changes |
-| 5 | Performance UI | Large active voice, key, chord and recording displays, loop progress indicators, compact mode, and clear advanced controls | Essential performance controls stay visible at supported screen sizes and normal Windows scaling |
+| Implemented in 0.3.0; live check pending | Gesture calibration and precision | Calibrated movement range, adjustable sensitivity, dead zones, pose timing, and a visible parameter/action overlay | Deliberate gestures work consistently while small incidental movement avoids unwanted changes |
+| Partial in 0.3.0 | Performance UI | Large active voice, key, chord and recording displays, loop progress indicators, compact mode, and clear advanced controls | Essential performance controls stay visible at supported screen sizes and normal Windows scaling |
 | 6 | Recording calibration | Measure routing and conversion delay, save a profile, and apply the measured recording offset | Recorded transients align against a reference within a measured tolerance shown to the user |
 
 Clock synchronization must address tempo changes and the playback speed of existing loops. The current looper keeps existing clips at their recorded speed.
@@ -71,6 +71,16 @@ Each release should update its version, notes, compatibility information, and ve
 
 - Gapless song transitions with explicit backing/loop carryover rules.
 - Per-loop pitch-preserving time stretch when the master tempo changes.
-- Gesture control for capture length, overdub feedback, and loop-edge treatment.
+- Implemented in 0.3.0: gesture control for capture length, overdub feedback, loop-edge treatment, tempo, key, chords, and count-in.
 - Recovery retention policy and a selectable backup history.
-- Dedicated performance mode with configurable high-contrast displays and larger controls.
+- Stage view with larger controls implemented in 0.3.0; configurable displays and further compact layouts remain candidates.
+
+## Standalone progress in 0.3.0
+
+- Implemented: movement calibration, deadband, smoothing, sensitivity, pose hold and pinch timing, movement freeze, action/value feedback.
+- Implemented: stage view and fullscreen, emergency mute shortcut, expanded musical gesture targets and actions.
+- Implemented: manual output-test tone, excluded from loop capture and recordings.
+- Fixed: conflicting capture/overdub commands during a queued count-in.
+- Verified: 72 automated behavior tests, desktop layout checks, and installed package startup.
+- Pending: live webcam usability and speaker checks. The output-test tone is an audible playback aid, not an automated connection wizard or measured audio round trip.
+- FL Studio testing is paused because the application was uninstalled after failing. Resume the existing test sequence after reinstallation. No end-to-end FL connection is claimed.

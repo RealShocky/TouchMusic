@@ -328,6 +328,7 @@ class AudioEngine:
                        'seam_ms': 0}
         self.clock = BeatClock(RATE)
         self.track, self.preview = SamplePlayer(), SamplePlayer()
+        self.test_tone = SamplePlayer()
         self.loops = [LoopTrack(RATE) for _ in range(LOOP_COUNT)]
         self.loop = self.loops[0]
         self.commands = queue.SimpleQueue()
@@ -341,6 +342,15 @@ class AudioEngine:
         self.overruns = 0
         self.error = ''
         self.phase = 0
+
+    def play_test_tone(self):
+        frames = round(RATE * .8)
+        audio = .08 * np.sin(2 * np.pi * 440 * np.arange(frames) / RATE)
+        fade = np.linspace(0, 1, round(RATE * .02))
+        audio[:len(fade)] *= fade
+        audio[-len(fade):] *= fade[::-1]
+        self.test_tone.load(audio.astype(np.float32))
+        self.test_tone.toggle()
 
     def apply_loop_commands(self):
         self._read_commands('Immediate')
@@ -360,8 +370,9 @@ class AudioEngine:
                 for queued in ('loop', 'overdub', 'restart', 'finish'):
                     self.clock.discard((queued, index))
             capturing = action in ('loop', 'overdub')
-            if capturing and key in pending:
-                self.clock.discard(key)
+            if capturing and any((queued, index) in pending for queued in ('loop', 'overdub')):
+                self.clock.discard(('loop', index))
+                self.clock.discard(('overdub', index))
             elif capturing and not self.loops[index].recording and self.params['count_in']:
                 boundary = self.clock.boundary('Next beat' if mode == 'Immediate' else mode)
                 frame = boundary + round(self.params['count_in'] * 4 * self.clock.period)
@@ -512,6 +523,7 @@ class AudioEngine:
             recorder.write(mix, stems, self.clock.frame, origins)
         heard = dry * p['gain'] if p['monitor'] == 'Dry mic' else vocal
         preview = self.preview.read(len(audio)) * .65
+        preview += self.test_tone.read(len(audio))
         counting = any(key[0] in ('loop', 'overdub') and key in self.clock.beat_targets
                        for key in self.clock.pending)
         click = self.clock.click(len(audio)) if p['metronome'] or counting else 0
@@ -593,6 +605,7 @@ class AudioEngine:
         self.stream = stream
 
     def stop(self):
+        self.test_tone.load([])
         if self.stream:
             self.stream.stop()
             self.stream.close()

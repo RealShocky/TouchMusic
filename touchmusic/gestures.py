@@ -29,8 +29,10 @@ def finger_count(points):
 
 
 class GestureMapper:
-    def __init__(self):
+    def __init__(self, hold_seconds=POSE_HOLD_SECONDS, smoothing_seconds=.09):
         self.states = {}
+        self.hold_seconds = hold_seconds
+        self.smoothing_seconds = smoothing_seconds
 
     def lost(self):
         self.states.clear()
@@ -46,7 +48,7 @@ class GestureMapper:
         span = float(np.clip((distance - .25) / .9, 0, 1))
         if old:
             elapsed = max(0, now - old['time'])
-            alpha = 1 - np.exp(-elapsed / .09)
+            alpha = 1 - np.exp(-elapsed / max(.001, self.smoothing_seconds))
             x = old['x'] + alpha * (x - old['x'])
             y = old['y'] + alpha * (y - old['y'])
             span = old['span'] + alpha * (span - old['span'])
@@ -58,7 +60,7 @@ class GestureMapper:
         since = old['since'] if same else now
         fired = old['fired'] if same else False
         pose = None
-        if count is not None and not fired and now - since >= POSE_HOLD_SECONDS:
+        if count is not None and not fired and now - since >= self.hold_seconds:
             pose = count
             fired = True
         self.states[hand] = {'held': pinched, 'x': x, 'y': y, 'time': now,

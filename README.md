@@ -38,7 +38,7 @@ Download the Windows setup ZIP from [Releases](https://github.com/RealShocky/Tou
 
 The release also includes an installable wheel. With Python 3.11, install it directly:
 
-    py -3.11 -m pip install https://github.com/RealShocky/TouchMusic/releases/download/v0.2.0/touchmusic-0.2.0-py3-none-any.whl
+    py -3.11 -m pip install https://github.com/RealShocky/TouchMusic/releases/download/v0.3.0/touchmusic-0.3.0-py3-none-any.whl
     touchmusic
 
 For character conversion, run the optional engine setup once:
@@ -275,3 +275,15 @@ The singing engine uses [Seed-VC](https://github.com/Plachtaa/seed-vc), pinned b
 - **Setlists:** use Session > Save skit for each song, then Session > Setlist to add and arrange skits. Save the list as `.tmsetlist`. Next song and Previous song can be assigned to gestures. Song recall stops audio and disarms gestures; check the setup and restart audio. Keep the skit files alongside the setlist when moving it.
 
 Live FL Studio routing and hardware timing remain under test. These additions work independently of DAW routing.
+
+## Stage view and gesture precision (0.3.0)
+
+- **Session > Stage view**, or **F11** from the main window, opens large voice, key, chord, tempo, and loop controls. In stage view, F11 toggles fullscreen. Space toggles output mute. Back to controls returns to the main window.
+- **F12** performs an emergency mute from anywhere inside TouchMusic: output muted, gestures disarmed, MIDI notes released. It leaves recording and the arrangement running. Unmute explicitly when ready; re-arm gestures separately.
+- **Gesture mapping > Precision and calibration** adjusts pose hold, movement smoothing, deadband, sensitivity, and pinch cooldown. Defaults retain the earlier 250 ms pose hold and 90 ms smoothing, with a 2% movement deadband.
+- Start the camera, click **Calibrate movement for 5 seconds**, and move both hands through a comfortable up/down and side-to-side range. Open and close thumb-index spread too. Calibration disarms gestures and retains prior ranges for axes without enough movement. It never arms gestures automatically. Reset calibration restores full movement ranges.
+- **Freeze movements** holds continuous controls while finger and pinch actions remain available. Calibration and precision settings save with presets, skits, recovery, and app settings. The temporary freeze switch is not saved.
+- New movement targets: **Tempo, Overdub feedback, Loop edge fade, Count-in bars, Capture length, Song key, Chord selection**. New pose actions: **Toggle overdub mode, Next capture length, Next count-in, Freeze movements, Emergency mute, Toggle stage view**. Tempo changes schedule future events; existing loops keep their recorded playback speed.
+- **Session > Test output** plays a quiet 440 Hz tone for 0.8 seconds through the selected output after audio is started. The tone obeys output mute and master level and is excluded from recorded mixes, stems, and loop capture. This verifies playback by listening, not an automatic device loopback measurement.
+
+Gesture precision and stage controls are covered by automated tests. Camera comfort, tracking consistency, audible hardware output, and DAW routing still need live validation.
