@@ -6,12 +6,13 @@
 ![Local AI](https://img.shields.io/badge/voice_conversion-local-7958A6)
 ![Status](https://img.shields.io/badge/status-experimental-D59C37)
 [![Latest release](https://img.shields.io/github/v/release/RealShocky/TouchMusic)](https://github.com/RealShocky/TouchMusic/releases/latest)
+[![PyPI](https://img.shields.io/pypi/v/touchmusic)](https://pypi.org/project/touchmusic/)
 
 **Perform live with your voice, switch characters with hand gestures, and build layered loops.**
 
 TouchMusic combines microphone effects, pitch correction, webcam hand tracking, reference-based AI voice conversion, a chord pad, a four-track looper, and WAV recording in a standalone Windows desktop app.
 
-[Quick start](#quick-start) · [Auto-Tune](#pitch-correction) · [Looper](#four-track-looper) · [Gestures](#gesture-control) · [Troubleshooting](#troubleshooting)
+[Quick start](#quick-start) � [Auto-Tune](#pitch-correction) � [Looper](#four-track-looper) � [Gestures](#gesture-control) � [Troubleshooting](#troubleshooting)
 
 ## Features
 
@@ -23,7 +24,7 @@ TouchMusic combines microphone effects, pitch correction, webcam hand tracking, 
 | AI conversion | Local pitch-conditioned Seed-VC; Live and Studio modes; compute and dropped-chunk status |
 | Gestures | Finger counts, fists, thumb-index pinch, hand height, horizontal movement, thumb-index spread |
 | Looper | Four tracks, 120 seconds per track, level, mute, restart, replacement undo, WAV export |
-| Musical timing | Tap tempo, 40–240 BPM, 4/4 metronome, immediate / next beat / next bar loop and chord changes |
+| Musical timing | Tap tempo, 40-240 BPM, 4/4 metronome, immediate / next beat / next bar loop and chord changes |
 | Vocal character | Chord-following harmonies, vocal-range selection, vibrato preservation, formant shifting |
 | Sessions | Portable skits with completed loops, backing, voice references, settings, scenes, and mappings |
 | Recording | Performance WAV, separate stems, optional automatic vocal and mix alignment |
@@ -44,7 +45,7 @@ For character conversion, run the optional engine setup once:
 
 Use **touchmusic --setup-ai --cpu** for CPU wheels. The standard setup selects NVIDIA CUDA wheels.
 
-After publication to PyPI, the equivalent package command is:
+Install from [PyPI](https://pypi.org/project/touchmusic/) with Python 3.11:
 
     py -3.11 -m pip install touchmusic
 
@@ -79,9 +80,9 @@ Launch.cmd changes to its own folder before starting the app, so it works from a
 
 ## Desktop shortcut
 
-Right-click **Launch.cmd** in your installation folder and choose **Show more options → Send to → Desktop (create shortcut)**. The shortcut should point to Launch.cmd, with **Start in** set to the installation folder.
+Right-click **Launch.cmd** in your installation folder and choose **Show more options  Send to  Desktop (create shortcut)**. The shortcut should point to Launch.cmd, with **Start in** set to the installation folder.
 
-You can also choose **New → Shortcut** on the desktop, browse to Launch.cmd, and name it **TouchMusic**.
+You can also choose **New  Shortcut** on the desktop, browse to Launch.cmd, and name it **TouchMusic**.
 
 ## Pitch correction
 
@@ -90,14 +91,14 @@ You can also choose **New → Shortcut** on the desktop, browse to Launch.cmd, a
 3. Set the song key, scale, and target. **Chromatic** uses the nearest semitone. **Key / scale** restricts correction to your scale. **Current chord** targets the active triad.
 4. Choose **Wet vocal** in Music tools to hear the processed result. Hold a sung note and watch the detected note, target, and cents meter.
 
-Higher retune speed pulls notes into tune faster. Dialogue mode bypasses pitch correction and vocal effects. The UI label “Auto-Tune” refers to TouchMusic's built-in pitch correction.
+Higher retune speed pulls notes into tune faster. Dialogue mode bypasses pitch correction and vocal effects. The UI label "Auto-Tune" refers to TouchMusic's built-in pitch correction.
 
 Music tools also contains vocal range, vibrato preservation, harmony mode, and formant controls. Formant shifting changes voice color independently of pitch and adds about 43 ms of processing delay while active.
 
 ## Character voices
 
 1. Click **Import audio** and choose WAV, MP3, FLAC, or OGG. The reference picker opens with a player and waveform.
-2. Listen with **Play song**, seek with the full-track slider, and click **Use playhead as start** when you find a section. Drag the green selection or either edge to choose 1–8 seconds. Zoom and the waveform scrollbar let you work through longer songs. **Play selection** auditions the highlighted section, and **Loop selection** repeats it.
+2. Listen with **Play song**, seek with the full-track slider, and click **Use playhead as start** when you find a section. Drag the green selection or either edge to choose 1-8 seconds. Zoom and the waveform scrollbar let you work through longer songs. **Play selection** auditions the highlighted section, and **Loop selection** repeats it.
 3. Enter a voice name and click **Use this section**. TouchMusic saves the selected audio and selects the new reference in the voice list.
 4. Click **Load singing engine** and wait until it reports ready.
 5. Enable **Use AI character conversion**, start audio, and speak or sing.
@@ -137,7 +138,7 @@ The clock uses 4/4 and starts when audio starts. Chords and loop restart follow 
 
 Open Music tools, choose a chord, and enable Play chord pad. Key and scale determine seven diatonic triads.
 
-**Map left fingers 1–5 to chords I–V** replaces those poses' previous mappings. You can assign all seven chords, next / previous chord, and the chord-pad switch individually.
+**Map left fingers 1-5 to chords I-V** replaces those poses' previous mappings. You can assign all seven chords, next / previous chord, and the chord-pad switch individually.
 
 For vocal harmony, choose Chord above or Chord below and raise Harmony on the Vocal effects tab.
 
@@ -153,7 +154,7 @@ For vocal harmony, choose Chord above or Chord below and raise Harmony on the Vo
 
 Hold a pose for about a quarter second. It fires once until the pose changes. Pinch means touching thumb tip to index fingertip. Leave pinch unassigned if you want that hand's closed fist to take priority.
 
-Assign voice slots in Gesture mapping. Default right-hand counts 1–4 select populated slots 1–4. Voice 5 is available to map. Rehearse assignments, then exit rehearsal and enable Arm gestures.
+Assign voice slots in Gesture mapping. Default right-hand counts 1-4 select populated slots 1-4. Voice 5 is available to map. Rehearse assignments, then exit rehearsal and enable Arm gestures.
 
 ## Vocal effects and scenes
 
@@ -196,7 +197,7 @@ For an existing performance, import the WAV mix or separate stems into FL Studio
 
 Open **MIDI / FL** in TouchMusic. Create a virtual port with [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html), click Refresh ports, select that port and channel, then Connect MIDI. Enable the same input in FL Studio's MIDI settings. **Test C4** checks the connection.
 
-In Gesture mapping, map continuous hand movements to **MIDI CC 0–119** and poses to **MIDI note C4–B4**, **MIDI chord**, or **MIDI chord I–VII**. The chord actions use the selected song key and scale. Set note velocity and length in MIDI / FL. **Map hand heights to CC 1 / 74** provides a quick starting point.
+In Gesture mapping, map continuous hand movements to **MIDI CC 0-119** and poses to **MIDI note C4-B4**, **MIDI chord**, or **MIDI chord I-VII**. The chord actions use the selected song key and scale. Set note velocity and length in MIDI / FL. **Map hand heights to CC 1 / 74** provides a quick starting point.
 
 Arm gestures to send. Rehearsal previews actions. Disarming sends all-notes-off. MIDI output disconnects when the app closes. Timed note release prevents a pose from leaving its notes held indefinitely. The all-notes-off button is also available manually. Connections are selected explicitly after launching the app.
 
@@ -261,3 +262,4 @@ This repository contains source and setup files. User audio, model weights, reco
 TouchMusic is an experimental Windows application. Automated DSP, transport, conversion-queue, recording, session, and UI tests were run during development. Live performance depends on your devices, reference audio, and GPU.
 
 The singing engine uses [Seed-VC](https://github.com/Plachtaa/seed-vc), pinned by Setup.cmd. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for source, model, and dependency information. The repository owner has not yet selected a license for TouchMusic's application source.
+
