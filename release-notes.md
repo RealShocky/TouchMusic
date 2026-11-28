@@ -3,7 +3,7 @@
 This is **0.5.0.dev1**, the first stability increment toward the ten-feature v0.5.0 goal. It is not the complete v0.5.0 release. Stable public downloads remain v0.4.0.
 
 - External VST3 effect processing moved to an owned child process with bounded JSON/PCM communication, watchdog, explicit restart and time-aligned dry fallback. The populated rack adds 2048 frames, approximately 42.7 ms at 48 kHz, excluding other latency.
-- Plugin Center adds metadata-only discovery, custom search folders, explicit isolated scans, binary hash/version reports, quarantine and reviewed official publisher links. The first pinned archive download is TDR Nova 2.2.3; installation remains manual.
+- Plugin Center adds metadata-only discovery, custom search folders, explicit isolated scans, binary hash/version reports, quarantine and reviewed official publisher links. Pinned archive downloads include TDR Nova 2.2.3, SnapTune 2.4.0 and LyraTune 0.6.7; installation remains manual.
 - Stereo external FX reach stereo device output and new performance/stem WAVs. The mono processing API and old loop assets remain compatible.
 - Native editor broker opens the actual loaded plugin interface off the desktop process. Audio must be stopped. Actual vendor-window testing remains pending; exposed parameter persistence exists, opaque saved state does not.
 - Gesture Learn binds a deliberate movement axis to a selected parameter with timeout, cancellation and performance disarming.
@@ -14,7 +14,7 @@ This is **0.5.0.dev1**, the first stability increment toward the ten-feature v0.
 
 Full DAW AI audio return, dedicated VST3 instrument hosting, opaque state, full stereo assets, sample-accurate Motion Score and broad plugin certification remain unfinished. Existing control bridge behavior is preserved. No microphone/camera/FL Studio validation is claimed in this snapshot.
 
-112 Python regression tests and 47 native SDK validator checks passed. Actual native control hosting, wheel/sdist metadata, separate-target package startup, plugin child startup and setup ZIP contents were checked. Verification results and measured limitations are recorded in docs/PLUGIN_COMPATIBILITY.md and docs/BENCHMARKS.md. The v0.4.0 regression suite is retained and expanded with worker, framing, stereo, discovery, download-integrity, learning and score tests.
+113 Python regression tests and 47 native SDK validator checks passed. Actual native control hosting, wheel/sdist metadata, separate-target package startup, plugin child startup and setup ZIP contents were checked. Verification results and measured limitations are recorded in docs/PLUGIN_COMPATIBILITY.md and docs/BENCHMARKS.md. The v0.4.0 regression suite is retained and expanded with worker, framing, stereo, discovery, download-integrity, learning and score tests.
 
 ---
 

@@ -49,7 +49,7 @@ At shutdown TouchMusic stops scanning, kills owned native children and closes it
 
 Discovery enumerates paths, treating a `.vst3` directory as one bundle. It does not instantiate plugins. Explicit scans use a separate worker and produce binary-hash/version/rate/block/parameter/impulse/RPC evidence. A failure quarantines that Plugin Center entry until a successful rescan. The direct FX file picker remains an explicit advanced loading path.
 
-The catalog separates official publisher identity, license label, reviewed download asset and measured compatibility. The first pinned download is TDR Nova 2.2.3. It is staged as an archive and never automatically executed/extracted. The SHA-256 is an observed integrity pin, not a publisher signature. Community catalogs are reference material only.
+The catalog separates official publisher identity, license label, reviewed download asset and measured compatibility. Pinned downloads are TDR Nova 2.2.3, SnapTune 2.4.0 and LyraTune 0.6.7. It is staged as an archive and never automatically executed/extracted. The SHA-256 is an observed integrity pin, not a publisher signature. Community catalogs are reference material only.
 
 Native editors use the actual loaded plugin instance on the worker's main thread. The GUI remains available; audio start and rack changes are blocked until the editor closes. Exposed parameters synchronize afterward. Full opaque state persistence across restarts/projects is not implemented yet.
 

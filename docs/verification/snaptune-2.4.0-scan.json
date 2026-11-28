@@ -1,0 +1,21 @@
+{
+  "path": "SnapTune.vst3",
+  "version": "2.4.0",
+  "status": "Passed smoke test",
+  "tested_at": "2026-11-28T10:46:00.195849+00:00",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "rate": 48000,
+  "block_frames": 512,
+  "blocks": 100,
+  "hardware_tested": false,
+  "editor_tested": false,
+  "daw_tested": false,
+  "binary_sha256": "79cc85e7442cbe2a7b8a890012c9315074cb97fa536f15956e15da4e88dec8e8",
+  "parameters": 30,
+  "impulse_onset_samples": 2985,
+  "impulse_note": "Onset at default settings; not declared latency or hardware round trip.",
+  "rpc_ms_p50": 0.5951499915681779,
+  "rpc_ms_p95": 0.8396749850362539,
+  "automation": "Passed normalized readback: key",
+  "pedalboard_version": "0.9.26"
+}

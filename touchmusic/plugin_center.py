@@ -58,7 +58,7 @@ class PluginCenter(QDialog):
             button = QPushButton(title)
             button.clicked.connect(callback)
             pane.addWidget(button)
-        pane.addWidget(QLabel('Reviewed archive: TDR Nova 2.2.3. Other entries use publisher downloads.\n'
+        pane.addWidget(QLabel('Reviewed archives: TDR Nova 2.2.3, SnapTune 2.4.0, LyraTune 0.6.7.\n'
                              'Downloads are saved, never executed. No third-party binaries are bundled.'))
         self.report = QTextEdit()
         self.report.setReadOnly(True)
@@ -76,7 +76,7 @@ class PluginCenter(QDialog):
         return item.data(Qt.UserRole) if item else None
 
     def refresh(self):
-        if self.task:
+        if self.task or self.cancelled:
             return
         paths = [*standard_folders(), *self.owner.settings.get('plugin_folders', [])]
         self.run(lambda: ('discovery', discover(paths)), 'Discovering installed VST3 paths...')
@@ -113,6 +113,9 @@ class PluginCenter(QDialog):
                 raise RuntimeError('Scan cancelled.')
             client = PluginProcess()
             self.clients.append(client)
+            if self.cancelled:
+                client.close()
+                raise RuntimeError('Scan cancelled.')
             return client
         self.run(lambda: ('scan', scan_plugin(path, version, factory)),
                  'Testing in a separate process. Loading and processing have timeouts...')
@@ -179,6 +182,7 @@ class PluginCenter(QDialog):
                 self.installed.addItem(item)
             self.status.setText(f'{len(value)} VST3 paths discovered. Select one and scan.')
         elif kind == 'scan':
+            self.clients.clear()
             self.reports[value['path']] = value
             self.report.setPlainText(json.dumps(value, indent=2))
             self.status.setText(value['status'] + ': ' + value.get('error', 'Automated smoke test only.'))

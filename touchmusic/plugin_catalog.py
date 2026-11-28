@@ -29,7 +29,17 @@ CATALOG = [
 DOWNLOADS = {'TDR Nova': {
     'version': '2.2.3', 'filename': 'TDR-Nova-2.2.3.zip',
     'url': 'https://www.tokyodawn.net/labs/Nova/2.2.3/TDR%20Nova%20%28no%20installer%29.zip',
-    'sha256': '9bb52d042bd95dd85456da66316347a00d865d9d3f6652333e1a2bc195cb8907'}}
+    'sha256': '9bb52d042bd95dd85456da66316347a00d865d9d3f6652333e1a2bc195cb8907'},
+    'SnapTune': {
+        'version': '2.4.0', 'filename': 'SnapTune-2.4.0-Windows.zip',
+        'url': 'https://github.com/NicoFerni/snaptune/releases/download/v2.4.0/SnapTune-2.4.0-Windows.zip',
+        'sha256': '57cb962fa66476f64dabd03016b7617d6ae35707c081f3c8091661bbf59e3791',
+        'redirect_hosts': ['release-assets.githubusercontent.com']},
+    'LyraTune': {
+        'version': '0.6.7', 'filename': 'LyraTune-0.6.7-win-x64-vst3.zip',
+        'url': 'https://github.com/333stack/LyraTune/releases/download/v0.6.7/LyraTune-0.6.7-win-x64-vst3.zip',
+        'sha256': '4688b5e4174ffc98c3ba61d37abbfcd2cf6c4cf4f0e6eeef4ea9caa344702750',
+        'redirect_hosts': ['release-assets.githubusercontent.com']}}
 
 
 def download_plugin(name, directory, opener=urlopen):
@@ -41,7 +51,8 @@ def download_plugin(name, directory, opener=urlopen):
     try:
         with os.fdopen(descriptor, 'wb') as output, opener(asset['url'], timeout=30) as source:
             final = urlparse(source.geturl())
-            if final.scheme != 'https' or final.hostname != urlparse(asset['url']).hostname:
+            allowed = [urlparse(asset['url']).hostname, *asset.get('redirect_hosts', [])]
+            if final.scheme != 'https' or final.hostname not in allowed:
                 raise ValueError('Unexpected download redirect. Use the publisher link.')
             while True:
                 block = source.read(65536)

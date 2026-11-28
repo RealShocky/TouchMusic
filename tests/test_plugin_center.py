@@ -1,4 +1,5 @@
 from io import BytesIO
+import hashlib
 import numpy as np
 import pytest
 from touchmusic.plugin_scan import discover, scan_plugin
@@ -43,6 +44,18 @@ def test_download_rejects_cross_origin_redirect(tmp_path):
     with pytest.raises(ValueError, match='redirect'):
         download_plugin('TDR Nova', tmp_path, lambda *a, **k: Response(b'data'))
     assert not list(tmp_path.iterdir())
+
+
+def test_reviewed_github_release_redirect_stages_only_hash_matched_bytes(tmp_path, monkeypatch):
+    data = b'reviewed archive fixture'
+    asset = {**DOWNLOADS['SnapTune'], 'sha256': hashlib.sha256(data).hexdigest()}
+    monkeypatch.setitem(DOWNLOADS, 'SnapTune', asset)
+    class Response(BytesIO):
+        def geturl(self):
+            return 'https://release-assets.githubusercontent.com/official-asset'
+    path = download_plugin('SnapTune', tmp_path, lambda *a, **k: Response(data))
+    assert path.read_bytes() == data
+    assert list(tmp_path.iterdir()) == [path]
 
 
 def test_learn_requires_deliberate_unambiguous_movement_and_times_out():

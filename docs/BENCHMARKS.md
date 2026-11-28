@@ -41,4 +41,6 @@ Automated: preserve all original 85 tests and run the expanded worker/protocol/q
 
 Still required for v0.5.0: sustained native worker/editor restarts, a 60-minute named-hardware run, webcam gestures, live mic/headphones and listening quality, model-specific CPU/GPU/memory measurements, actual audio dropouts/round-trip calibration, instrument note lifecycle and a real wet-AI DAW return. FL Studio testing is blocked until reinstallation. Never replace these with synthetic results or a passing unit-test count.
 
-This development checkpoint passed 112 Python tests and reran 47 SDK checks against the unchanged compiled control bridge. Wheel/sdist metadata, a separate-target installed GUI/worker startup and setup archive allowlists also passed. [Verification record](verification/development-checks.json).
+This development checkpoint passed 113 Python tests and reran 47 SDK checks against the unchanged compiled control bridge. Wheel/sdist metadata, a separate-target installed GUI/worker startup and setup archive allowlists also passed. [Verification record](verification/development-checks.json).
+
+SnapTune 2.4.0 and LyraTune 0.6.7 also passed isolated 100-block scans. A paced SnapTune/Nova chain had zero pre-fault fallback segments, survived deliberate worker termination with finite stereo fallback, and explicitly restarted. See the compatibility matrix and raw fault report.

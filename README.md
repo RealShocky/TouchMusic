@@ -321,7 +321,7 @@ With audio stopped, **Open native editor** opens the actual plugin interface in 
 
 Saved skits never automatically load native effects. Review the paths and choose **Restore saved rack**. Plugins must remain installed at their saved paths. This process boundary contains crashes, not malicious binaries running with your OS permissions.
 
-Plugin Center lists fifteen official publisher candidates and stages a checksum-pinned TDR Nova 2.2.3 archive. Downloaded files are never executed or automatically installed. Other candidates open their official publisher pages until an exact asset is reviewed. No third-party effects or personal references are redistributed. See the [versioned compatibility matrix](docs/PLUGIN_COMPATIBILITY.md), which distinguishes scan evidence from actual editor, listening, hardware and DAW checks.
+Plugin Center lists fifteen official publisher candidates and stages checksum-pinned TDR Nova 2.2.3, SnapTune 2.4.0 and LyraTune 0.6.7 archives. Downloaded files are never executed or automatically installed. Other candidates open their official publisher pages until an exact asset is reviewed. No third-party effects or personal references are redistributed. See the [versioned compatibility matrix](docs/PLUGIN_COMPATIBILITY.md), which distinguishes scan evidence from actual editor, listening, hardware and DAW checks.
 
 ### Motion Score in the development checkout
 

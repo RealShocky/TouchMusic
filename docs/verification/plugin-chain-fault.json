@@ -1,0 +1,18 @@
+{
+  "plugins": [
+    "SnapTune 2.4.0",
+    "TDR Nova 2.2.3"
+  ],
+  "rate": 48000,
+  "block_frames": 512,
+  "blocks": 104,
+  "nominal_pacing_ms": 11,
+  "fault_injected_at_block": 72,
+  "pre_fault_fallback_segments": 0,
+  "post_fault_fallback_segments": 27,
+  "worker_exit_detected": true,
+  "finite_stereo": true,
+  "explicit_restart": "Passed",
+  "hardware_tested": false,
+  "daw_tested": false
+}

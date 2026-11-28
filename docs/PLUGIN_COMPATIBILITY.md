@@ -8,6 +8,8 @@ Updated 2026-11-28. A catalog listing means a publisher was identified, not that
 | --- | --- | --- | --- | --- | --- |
 | TDR Nova | 2.2.3, Windows x64 | Pedalboard 0.9.26 in owned child; 48 kHz; 100 x 512-frame stereo blocks | Passed loading, finite stereo output and normalized parameter readback; 76 parameters | RPC p50 0.666 ms / p95 0.933 ms in scan; default impulse onset 184 samples; automated parameter `band_1_selected` | Native editor not tested; no mic/speaker round trip; FL Studio not tested |
 | TDR Nova | 2.2.3, same binary | Isolated scheduled rack; 104 blocks; nominal 11 ms pacing | Passed finite stereo output, zero worker errors and zero fallback segments after dirty-parameter optimization | 2048-frame worker schedule; brief synthetic pacing, not a hardware dropout test | No hardware or DAW validation |
+| SnapTune | 2.4.0, Windows x64 | Pedalboard 0.9.26 in owned child; 48 kHz; 100 x 512-frame stereo blocks | Passed load, finite stereo and normalized readback; 30 parameters | RPC p50 0.595 ms / p95 0.840 ms; default impulse onset 2985 samples; parameter `key` | Editor, hardware and DAW not tested |
+| LyraTune | 0.6.7, Windows x64 | Pedalboard 0.9.26 in owned child; 48 kHz; 100 x 512-frame stereo blocks | Passed load, finite stereo and normalized readback; 28 parameters | RPC p50 0.599 ms / p95 0.787 ms; default impulse onset 357 samples; parameter `bypass` | Editor, hardware and DAW not tested |
 | TouchMusic Control Bridge | 0.4.0, Windows x64 | Steinberg SDK validator and actual Pedalboard host during v0.4.0 release | 47 validator tests passed; unchanged native audio passthrough and UDP automation verified | Ten controls and soft host timing; not an AI audio bridge | FL Studio and hardware routing pending |
 
 TDR Nova binary SHA-256:
@@ -20,14 +22,14 @@ Developer-hosted 2.2.3 portable ZIP observed SHA-256:
 
 The archive hash is an integrity pin observed during development, not an independent publisher signature. The impulse onset includes the default effect's response and is not declared plugin latency, total TouchMusic latency, AI latency or a measured hardware round trip. RPC timing is from this development host and is not a general latency promise.
 
-## Reviewed candidates, not yet compatibility tested
+## Catalog sources and remaining compatibility work
 
 | Candidate | Official source | Publisher license label | Tested version / result |
 | --- | --- | --- | --- |
-| SnapTune | https://github.com/NicoFerni/snaptune | AGPL-3.0 | None; publisher's 2.7 ms live-mode claim is not a TouchMusic measurement |
+| SnapTune | https://github.com/NicoFerni/snaptune | AGPL-3.0 | 2.4.0 smoke test above; publisher's 2.7 ms live-mode claim is not a TouchMusic measurement |
 | Graillon 3 | https://www.auburnsounds.com/products/Graillon.html | Proprietary free edition | None; edition/features/license need asset-specific review |
 | MAutoPitch | https://www.meldaproduction.com/MAutoPitch | Proprietary freeware | None |
-| LyraTune | https://github.com/333stack/LyraTune | AGPL-3.0 | None |
+| LyraTune | https://github.com/333stack/LyraTune | AGPL-3.0 | 0.6.7 smoke test above |
 | OpenVoxTuner | https://github.com/EiffelBS/OpenVoxTuner | AGPL-3.0 | None; upstream ARA/standalone features do not establish TouchMusic support |
 | NoteForge | https://github.com/bighandfoot/NoteForge | AGPL-3.0 | None; correct repository is the audio editor, not similarly named note-taking apps |
 | TDR Kotelnikov | https://www.tokyodawn.net/tdr-kotelnikov/ | Proprietary freeware | None |
@@ -46,3 +48,7 @@ No third-party plugin binaries are distributed in TouchMusic. Source license lab
 Use Plugin Center -> Discover -> select binary -> enter its exact publisher version -> Scan selected. Reports include a binary hash, UTC test time, platform, rate/block/count, finite stereo probe, parameter readback, impulse onset and RPC timing. An unknown version stays Unknown and must not be converted into a guessed compatibility version.
 
 Record separate editor open/close checks, sustained automation, pluginval logs, listening, hardware and DAW/version checks as they are actually performed. A failed scan quarantines the Plugin Center entry; replacing the binary requires a fresh successful scan. Do not treat the 100-block smoke test as a soak test or a complete preset certification.
+
+Additional exact binary records: [SnapTune 2.4.0](verification/snaptune-2.4.0-scan.json), [LyraTune 0.6.7](verification/lyratune-0.6.7-scan.json). The catalog's pinned SnapTune/LyraTune archive hashes match GitHub release asset digest metadata from their publisher repositories. Native binaries are not redistributed.
+
+A two-effect SnapTune 2.4.0 -> TDR Nova 2.2.3 scheduled chain completed 72 paced blocks with zero fallback segments before the owned worker was deliberately terminated. TouchMusic detected the exit, returned finite stereo delayed-dry fallback and successfully restarted the rack. This is software fault injection, not an audio-device or listening test. [Raw result](verification/plugin-chain-fault.json).

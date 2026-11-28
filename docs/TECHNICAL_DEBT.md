@@ -18,6 +18,6 @@ This document explains implementation risks. [roadmap.md](../roadmap.md) owns fe
 | TD12 | Sessions | New optional score is validated; broader schema migration/instance locking is unfinished | Archived v0.4 fixtures, future schema migrations and single-writer recovery ownership |
 | TD13 | Platforms | Windows tested; portable Python code and upstream cross-platform support are insufficient | macOS/Linux camera/audio/model/native builds and actual device validation |
 | TD14 | GPU baseline | Synthetic FX benchmark never invokes AI; nvidia-smi is system-wide telemetry | Model/reference/quality-specific GPU timing, allocated memory and listening-quality fixtures on named hardware |
-| TD15 | Downloads | Only one exact official archive currently reviewed and pinned | Review additional publisher assets, terms, platform/version/size/hash provenance and controlled extraction/install UX |
+| TD15 | Downloads | Three exact official archives currently reviewed and pinned | Review additional publisher assets, terms, platform/version/size/hash provenance and controlled extraction/install UX |
 
 Do not resolve these by suppressing error counters, claiming unperformed hardware checks, or silently removing creative features. Preserve the baseline, surface degradation, and tie each fix to a measurable regression check.

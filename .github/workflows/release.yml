@@ -73,6 +73,12 @@ jobs:
           path: |
             dist/*.whl
             dist/*.tar.gz
+      - name: Preserve reviewable development packages
+        if: steps.version.outputs.publishable != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: touchmusic-development-packages
+          path: dist/*
       - name: Publish GitHub release
         if: steps.version.outputs.publishable == 'true'
         env:

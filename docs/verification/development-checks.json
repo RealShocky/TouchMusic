@@ -1,7 +1,7 @@
 {
   "snapshot": "0.5.0.dev1",
   "python_tests": {
-    "passed": 112,
+    "passed": 113,
     "failed": 0,
     "scope": "Automated behavior and offscreen Qt"
   },
@@ -26,5 +26,15 @@
   "daw_tested": false,
   "vendor_native_editor_tested": false,
   "full_v050_goal_complete": false,
-  "tested_at_utc": "2026-11-28T10:43:21.412586+00:00"
+  "tested_at_utc": "2026-11-28T12:30:34.526938+00:00",
+  "initial_ci": {
+    "commit": "e0a2fec4095aff2ee33af7906b5138253a57d058",
+    "run": "https://github.com/RealShocky/TouchMusic/actions/runs/46136570127",
+    "result": "Passed test, native rebuild and package jobs; PyPI publication correctly skipped for development version"
+  },
+  "plugins_smoke_tested": [
+    "TDR Nova 2.2.3",
+    "SnapTune 2.4.0",
+    "LyraTune 0.6.7"
+  ]
 }

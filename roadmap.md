@@ -12,7 +12,7 @@ Updated 2026-11-28. This is the single requirements and delivery tracker. It sup
 
 Priority P0 is stability and compatibility, P1 is production functionality, P2 is expansion. Windows x64 is the supported platform. Python portability does not establish macOS/Linux support.
 
-Current automated checkpoint: **112 Python tests**, **47 native SDK checks**, actual native host/control transport, package metadata and installed GUI/worker startup passed. [Evidence](docs/verification/development-checks.json). These are software checks, not microphone/camera/DAW validation.
+Current automated checkpoint: **113 Python tests**, **47 native SDK checks**, actual native host/control transport, package metadata and installed GUI/worker startup passed. [Evidence](docs/verification/development-checks.json). These are software checks, not microphone/camera/DAW validation.
 
 The published baseline is **v0.4.0**. **v0.5.0 is in development, not released or production certified.** The ten requested v0.5.0 capabilities below are the release scope. A partial implementation does not satisfy that release gate.
 
@@ -22,7 +22,7 @@ The published baseline is **v0.4.0**. **v0.5.0 is in development, not released o
 | --- | --- | --- | --- | --- |
 | V50-01 | P0 | Isolated VST3 effect hosting | In Progress | Owned child process, bounded IPC/queues, watchdog, delayed dry fallback, explicit restart and transactional load implemented. Automated termination/timeout tests pass. Finish lifecycle/long-session stress checks and recovery UX. A process boundary is not a malware sandbox. |
 | V50-02 | P0 | Plugin Center discovery and management | In Progress | Metadata-only discovery of standard/user folders, manual scan/load, binary-identity cache and failed-scan quarantine implemented. Complete asynchronous rack load and scan invalidation/lifecycle tests. |
-| V50-03 | P1 | Curated catalog and official downloads | In Progress | Fifteen publisher entries, license labels, official links and checksum-pinned TDR Nova 2.2.3 archive staging implemented. Review/version-pin further downloads individually. Never equate freeware with redistribution rights. |
+| V50-03 | P1 | Curated catalog and official downloads | In Progress | Fifteen publisher entries, license labels, official links and checksum-pinned TDR Nova 2.2.3, SnapTune 2.4.0 and LyraTune 0.6.7 archive staging implemented. Review/version-pin further downloads individually. Never equate freeware with redistribution rights. |
 | V50-04 | P0 | Compatibility scanner | In Progress | Separate-process load, 100-block stereo/finite-output probe, default impulse onset, parameter readback, binary SHA-256 and JSON reports implemented. Add multiple rates/block sizes, pluginval integration and sustained automation stress. Impulse onset is not declared plugin latency or hardware round trip. |
 | V50-05 | P1 | Native plugin editor interfaces | Implemented | Actual Pedalboard show_editor runs on the plugin worker main thread. Audio must be stopped, UI remains responsive, exposed parameters synchronize on close. Broker routing tested; actual vendor editor opening/closing remains unverified. Opaque state persistence is a separate dependency. |
 | V50-06 | P0 | Stereo audio engine | In Progress | External stereo FX survive through hardware callback and new stereo performance/stem WAVs; mono processing API and legacy loops remain compatible. Stereo regression test passes. Stereo backing/reference/loop assets and full project migration remain planned. |
