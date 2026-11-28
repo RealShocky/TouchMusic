@@ -4,11 +4,11 @@ TouchMusic is a standalone vocal performance instrument with gesture control and
 
 ## Current baseline
 
-Version 0.1.0 is published on GitHub Releases and PyPI.
+Version 0.2.0 adds standalone performance upgrades to the GitHub and PyPI distribution.
 
 - Standalone desktop effects, pitch correction, voice references, and local AI conversion.
-- Reference-import player with waveform, zoom, and draggable 1-8 second selection.
-- Four loop tracks with beat/bar scheduling, tap tempo, metronome, and take replacement undo.
+- Reference-import player with waveform, zoom, and draggable 1–8 second selection.
+- Four loop tracks with beat/bar scheduling, tap tempo, metronome, and overdub, undo/redo, count-in, fixed-bar capture, edge fades, and progress.
 - Diatonic chord pad, chord-following harmonies, formant controls, and voice slots.
 - Gesture-to-MIDI CC, notes, and chords with timed note release and all-notes-off.
 - Portable skits, WAV stems, and optional aligned vocal and mix export.
@@ -44,19 +44,19 @@ Testing can start with the available hardware and drivers. An existing MIDI rout
 
 ## Suggested standalone work before FL testing
 
-These are proposed additions that can be developed and verified independently of FL Studio.
+The approved standalone increment is implemented in 0.2.0. Live hardware checks remain part of user testing.
 
 | Priority | Candidate | Intended result |
 | --- | --- | --- |
-| 1 | Reference quality assistant | Flag silence and clipping, suggest candidate vocal sections, and let the user audition and choose them |
-| 2 | Looper overdubbing | Add another layer to a playing loop with layer undo/redo and controlled feedback |
-| 3 | Count-in and fixed-bar capture | One- or two-bar count-in and automatic capture lengths of 1, 2, 4, or 8 bars |
-| 4 | Crash recovery | Recover completed loops and the last usable skit after an unexpected exit |
-| 5 | Setlists | Recall per-song backing, key, tempo, voices, chords, and gesture assignments in performance order |
-| 6 | Clearer vocal controls | Show bypass reasons, provide direct tuning strength/speed access, and audition dry versus processed sound |
-| 7 | Loop seam treatment | Optional short crossfades to reduce clicks at loop boundaries while preserving the chosen loop length |
+| Complete | Reference quality assistant | Flag silence and clipping, suggest candidate vocal sections, and let the user audition and choose them |
+| Complete | Looper overdubbing | Add another layer to a playing loop with layer undo/redo and controlled feedback |
+| Complete | Count-in and fixed-bar capture | One- or two-bar count-in and automatic capture lengths of 1, 2, 4, or 8 bars |
+| Complete | Crash recovery | Recover completed loops and the last usable skit after an unexpected exit |
+| Complete | Setlists | Recall per-song backing, key, tempo, voices, chords, and gesture assignments in performance order |
+| Existing | Clearer vocal controls | Show bypass reasons, provide direct tuning strength/speed access, and audition dry versus processed sound |
+| Complete | Loop seam treatment | Optional short edge fades to reduce clicks at loop boundaries while preserving the chosen loop length |
 
-The suggested first standalone increment is reference quality feedback plus count-in and fixed-bar capture. Both extend controls already used during import and looping.
+Recovery preserves completed assets, not an active take or undo history. Setlist recall stops audio and disarms gestures. Reference suggestions use level and silence heuristics, not vocal detection. Four undo states are retained per loop. Count-in clicks are monitoring-only.
 
 ## Later exploration
 
@@ -67,3 +67,10 @@ The suggested first standalone increment is reference quality feedback plus coun
 
 Each release should update its version, notes, compatibility information, and verification results. Features needing a live DAW or device check stay pending until that check is recorded.
 
+## Additional candidates after this increment
+
+- Gapless song transitions with explicit backing/loop carryover rules.
+- Per-loop pitch-preserving time stretch when the master tempo changes.
+- Gesture control for capture length, overdub feedback, and loop-edge treatment.
+- Recovery retention policy and a selectable backup history.
+- Dedicated performance mode with configurable high-contrast displays and larger controls.

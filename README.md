@@ -14,7 +14,7 @@ TouchMusic combines microphone effects, pitch correction, webcam hand tracking, 
 
 See [roadmap.md](roadmap.md) for planned upgrades, standalone feature ideas, and the FL Studio test sequence.
 
-[Quick start](#quick-start) � [Auto-Tune](#pitch-correction) � [Looper](#four-track-looper) � [Gestures](#gesture-control) � [Troubleshooting](#troubleshooting)
+[Quick start](#quick-start) · [Auto-Tune](#pitch-correction) · [Looper](#four-track-looper) · [Gestures](#gesture-control) · [Troubleshooting](#troubleshooting)
 
 ## Features
 
@@ -25,10 +25,10 @@ See [roadmap.md](roadmap.md) for planned upgrades, standalone feature ideas, and
 | Character voices | Import, preview, and rename your own references; five gesture voice slots |
 | AI conversion | Local pitch-conditioned Seed-VC; Live and Studio modes; compute and dropped-chunk status |
 | Gestures | Finger counts, fists, thumb-index pinch, hand height, horizontal movement, thumb-index spread |
-| Looper | Four tracks, 120 seconds per track, level, mute, restart, replacement undo, WAV export |
-| Musical timing | Tap tempo, 40-240 BPM, 4/4 metronome, immediate / next beat / next bar loop and chord changes |
+| Looper | Four tracks, 120 seconds per track, level, mute, restart, overdub, undo/redo, edge fades, progress, WAV export |
+| Musical timing | Tap tempo, 40–240 BPM, 4/4 metronome, immediate / next beat / next bar changes, count-in and fixed-bar capture |
 | Vocal character | Chord-following harmonies, vocal-range selection, vibrato preservation, formant shifting |
-| Sessions | Portable skits with completed loops, backing, voice references, settings, scenes, and mappings |
+| Sessions | Portable skits with completed loops, backing, voice references, settings, scenes, mappings, crash recovery, ordered setlists |
 | Recording | Performance WAV, separate stems, optional automatic vocal and mix alignment |
 | MIDI output | Gesture CC, notes, chords, velocity, channel, timed note release, all-notes-off |
 
@@ -38,7 +38,7 @@ Download the Windows setup ZIP from [Releases](https://github.com/RealShocky/Tou
 
 The release also includes an installable wheel. With Python 3.11, install it directly:
 
-    py -3.11 -m pip install https://github.com/RealShocky/TouchMusic/releases/download/v0.1.0/touchmusic-0.1.0-py3-none-any.whl
+    py -3.11 -m pip install https://github.com/RealShocky/TouchMusic/releases/download/v0.2.0/touchmusic-0.2.0-py3-none-any.whl
     touchmusic
 
 For character conversion, run the optional engine setup once:
@@ -82,9 +82,9 @@ Launch.cmd changes to its own folder before starting the app, so it works from a
 
 ## Desktop shortcut
 
-Right-click **Launch.cmd** in your installation folder and choose **Show more options  Send to  Desktop (create shortcut)**. The shortcut should point to Launch.cmd, with **Start in** set to the installation folder.
+Right-click **Launch.cmd** in your installation folder and choose **Show more options → Send to → Desktop (create shortcut)**. The shortcut should point to Launch.cmd, with **Start in** set to the installation folder.
 
-You can also choose **New  Shortcut** on the desktop, browse to Launch.cmd, and name it **TouchMusic**.
+You can also choose **New → Shortcut** on the desktop, browse to Launch.cmd, and name it **TouchMusic**.
 
 ## Pitch correction
 
@@ -93,14 +93,14 @@ You can also choose **New  Shortcut** on the desktop, browse to Launch.cmd, and
 3. Set the song key, scale, and target. **Chromatic** uses the nearest semitone. **Key / scale** restricts correction to your scale. **Current chord** targets the active triad.
 4. Choose **Wet vocal** in Music tools to hear the processed result. Hold a sung note and watch the detected note, target, and cents meter.
 
-Higher retune speed pulls notes into tune faster. Dialogue mode bypasses pitch correction and vocal effects. The UI label "Auto-Tune" refers to TouchMusic's built-in pitch correction.
+Higher retune speed pulls notes into tune faster. Dialogue mode bypasses pitch correction and vocal effects. The UI label “Auto-Tune” refers to TouchMusic's built-in pitch correction.
 
 Music tools also contains vocal range, vibrato preservation, harmony mode, and formant controls. Formant shifting changes voice color independently of pitch and adds about 43 ms of processing delay while active.
 
 ## Character voices
 
 1. Click **Import audio** and choose WAV, MP3, FLAC, or OGG. The reference picker opens with a player and waveform.
-2. Listen with **Play song**, seek with the full-track slider, and click **Use playhead as start** when you find a section. Drag the green selection or either edge to choose 1-8 seconds. Zoom and the waveform scrollbar let you work through longer songs. **Play selection** auditions the highlighted section, and **Loop selection** repeats it.
+2. Listen with **Play song**, seek with the full-track slider, and click **Use playhead as start** when you find a section. Drag the green selection or either edge to choose 1–8 seconds. Zoom and the waveform scrollbar let you work through longer songs. **Play selection** auditions the highlighted section, and **Loop selection** repeats it.
 3. Enter a voice name and click **Use this section**. TouchMusic saves the selected audio and selects the new reference in the voice list.
 4. Click **Load singing engine** and wait until it reports ready.
 5. Enable **Use AI character conversion**, start audio, and speak or sing.
@@ -127,10 +127,10 @@ For singing in time, use **Dry mic** headphone monitoring while recording the pr
 Set BPM or use Tap tempo, then choose Immediate, Next beat, or Next bar. Enable Metronome for a headphone click.
 
 - Click a pad to capture. Click it again to finish and play.
-- Quantized pads display Capture queued or Finish queued until the boundary. Press the same pad again before the boundary to cancel.
+- Quantized pads display the remaining beats until capture or finish. Press the same pad again before the boundary to cancel.
 - Starting capture on another track finishes the current capture.
 - Each track has level and mute. Select a track for restart, export, clear, or undo.
-- Capturing over a filled track replaces its take. Undo swaps the current and previous take. Clear loop clears both.
+- In Replace mode, capturing over a filled track replaces its take. Overdub adds a layer. Undo and Redo move through up to four prior committed takes. Clear loop clears the clip and history.
 - Four tracks hold up to 120 seconds each and play together.
 - Processed vocal captures effects and AI output, including conversion delay. Mic before AI captures after enabled pitch correction and before downstream AI and vocal effects.
 
@@ -140,7 +140,7 @@ The clock uses 4/4 and starts when audio starts. Chords and loop restart follow 
 
 Open Music tools, choose a chord, and enable Play chord pad. Key and scale determine seven diatonic triads.
 
-**Map left fingers 1-5 to chords I-V** replaces those poses' previous mappings. You can assign all seven chords, next / previous chord, and the chord-pad switch individually.
+**Map left fingers 1–5 to chords I–V** replaces those poses' previous mappings. You can assign all seven chords, next / previous chord, and the chord-pad switch individually.
 
 For vocal harmony, choose Chord above or Chord below and raise Harmony on the Vocal effects tab.
 
@@ -156,7 +156,7 @@ For vocal harmony, choose Chord above or Chord below and raise Harmony on the Vo
 
 Hold a pose for about a quarter second. It fires once until the pose changes. Pinch means touching thumb tip to index fingertip. Leave pinch unassigned if you want that hand's closed fist to take priority.
 
-Assign voice slots in Gesture mapping. Default right-hand counts 1-4 select populated slots 1-4. Voice 5 is available to map. Rehearse assignments, then exit rehearsal and enable Arm gestures.
+Assign voice slots in Gesture mapping. Default right-hand counts 1–4 select populated slots 1–4. Voice 5 is available to map. Rehearse assignments, then exit rehearsal and enable Arm gestures.
 
 ## Vocal effects and scenes
 
@@ -199,7 +199,7 @@ For an existing performance, import the WAV mix or separate stems into FL Studio
 
 Open **MIDI / FL** in TouchMusic. Create a virtual port with [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html), click Refresh ports, select that port and channel, then Connect MIDI. Enable the same input in FL Studio's MIDI settings. **Test C4** checks the connection.
 
-In Gesture mapping, map continuous hand movements to **MIDI CC 0-119** and poses to **MIDI note C4-B4**, **MIDI chord**, or **MIDI chord I-VII**. The chord actions use the selected song key and scale. Set note velocity and length in MIDI / FL. **Map hand heights to CC 1 / 74** provides a quick starting point.
+In Gesture mapping, map continuous hand movements to **MIDI CC 0–119** and poses to **MIDI note C4–B4**, **MIDI chord**, or **MIDI chord I–VII**. The chord actions use the selected song key and scale. Set note velocity and length in MIDI / FL. **Map hand heights to CC 1 / 74** provides a quick starting point.
 
 Arm gestures to send. Rehearsal previews actions. Disarming sends all-notes-off. MIDI output disconnects when the app closes. Timed note release prevents a pose from leaving its notes held indefinitely. The all-notes-off button is also available manually. Connections are selected explicitly after launching the app.
 
@@ -265,3 +265,13 @@ TouchMusic is an experimental Windows application. Automated DSP, transport, con
 
 The singing engine uses [Seed-VC](https://github.com/Plachtaa/seed-vc), pinned by Setup.cmd. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for source, model, and dependency information. The repository owner has not yet selected a license for TouchMusic's application source.
 
+## New in 0.2.0
+
+- **Import audio:** choose Suggest section or Next suggestion, audition it, then Use this section. The level, silence, and possible-clipping report updates when you drag the selection. Suggestions rank audio levels; they do not identify singers or isolate vocals from music.
+- **Loop capture:** select Replace or Overdub. Choose 0-2 count-in bars and Free length or 1/2/4/8 bars. Click a loop pad or use its gesture action. A second click cancels a queued start or finishes capture. Count-in clicks go to monitoring, not performance recordings.
+- **Overdub:** add layers to an existing loop, with up to four prior committed takes available through Undo/Redo. Feedback controls how much existing audio survives each pass. With a fixed length selected, overdubs finish after one existing-loop cycle. Recorded loops retain their original playback speed when BPM changes.
+- **Edge fade:** choose 0-20 ms to soften loop boundaries without changing duration. Loop pads display countdowns, recording state, and playback progress.
+- **Recovery:** completed loops, backing, references, scenes, and settings save in the background after changes settle. An unexpected exit offers Recover session before any new session can overwrite that backup. Session > Recover last session is also available after a normal exit. An unfinished recording and undo history are not recovered. Save important performances as skits as well.
+- **Setlists:** use Session > Save skit for each song, then Session > Setlist to add and arrange skits. Save the list as `.tmsetlist`. Next song and Previous song can be assigned to gestures. Song recall stops audio and disarms gestures; check the setup and restart audio. Keep the skit files alongside the setlist when moving it.
+
+Live FL Studio routing and hardware timing remain under test. These additions work independently of DAW routing.

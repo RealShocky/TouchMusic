@@ -66,8 +66,9 @@ class LoopTrack:
         self.rate = rate
         self.gain = .7
         self.muted = False
+        self.seam_ms = 0
+        self.feedback = 1.
         self.clear()
-        self.previous = None
 
     def clear(self):
         self.recording = False
@@ -75,12 +76,42 @@ class LoopTrack:
         self.position = 0
         self.clip = None
         self.buffer = None
+        self.overdubbing = False
+        self.history = []
+        self.future = []
+
+    @property
+    def previous(self):
+        return self.history[-1] if self.history else None
+
+    @previous.setter
+    def previous(self, clip):
+        self.history = [clip] if clip is not None else []
+        self.future = []
+
+    def _commit(self, clip):
+        if self.clip is not None:
+            self.history = [*self.history[-3:], self.clip]
+        self.future = []
+        self.clip = clip
+
+    def start_overdub(self, feedback=1.):
+        if self.recording or self.clip is None:
+            return
+        self.buffer = self.clip.copy()
+        self.feedback = max(0., min(1., feedback))
+        self.recording = self.overdubbing = True
 
     def toggle(self):
         if self.recording:
-            if self.size:
-                self.previous, self.clip = self.clip, self.buffer[:self.size].copy()
-            self.load(self.clip)
+            if self.overdubbing:
+                self._commit(self.buffer)
+            elif self.size:
+                self._commit(self.buffer[:self.size].copy())
+                self.position = 0
+            self.buffer = None
+            self.recording = self.overdubbing = False
+            self.size = len(self.clip) if self.clip is not None else 0
         else:
             self.size = 0
             self.buffer = np.empty(self.rate * LOOP_SECONDS, np.float32)
@@ -92,11 +123,32 @@ class LoopTrack:
         self.size = len(clip) if clip is not None else 0
 
     def undo(self):
-        if not self.recording and self.previous is not None:
-            clip, self.previous = self.previous, self.clip
-            self.load(clip)
+        if not self.recording and self.history:
+            self.future.append(self.clip)
+            self.clip = self.history.pop()
+            self.size = len(self.clip)
+            self.position %= self.size
+
+    def redo(self):
+        if not self.recording and self.future:
+            self.history.append(self.clip)
+            self.clip = self.future.pop()
+            self.size = len(self.clip)
+            self.position %= self.size
 
     def process(self, audio):
+        if self.overdubbing:
+            output = np.zeros_like(audio)
+            offset = 0
+            while offset < len(audio):
+                count = min(len(audio) - offset, len(self.buffer) - self.position)
+                target = slice(self.position, self.position + count)
+                if not self.muted:
+                    output[offset:offset+count] = self.buffer[target]
+                self.buffer[target] = self.buffer[target] * self.feedback + audio[offset:offset+count]
+                offset += count
+                self.position = (self.position + count) % len(self.buffer)
+            return output
         if self.recording:
             count = min(len(audio), len(self.buffer) - self.size)
             self.buffer[self.size:self.size + count] = audio[:count]
@@ -110,6 +162,9 @@ class LoopTrack:
             indices = (np.arange(len(audio)) + self.position) % len(clip)
             if not self.muted:
                 output[:] = clip[indices]
+                fade = min(round(self.seam_ms * self.rate / 1000), len(clip) // 2)
+                if fade:
+                    output *= np.minimum(1., np.minimum(indices, len(clip)-1-indices) / fade)
             self.position = int((self.position + len(audio)) % len(clip))
         return output
 
@@ -268,7 +323,9 @@ class AudioEngine:
                        'key': 0, 'scale': 'Major', 'tune': 0., 'retune': .45, 'tune_target': 'Key / scale',
                        'chord': 0, 'chord_enabled': False, 'chord_level': .45,
                        'bpm': 120, 'quantize': 'Immediate', 'metronome': False, 'loop_input': 'Processed vocal',
-                       'vocal_range': 'Wide', 'vibrato': 0., 'formant': 0., 'harmony_mode': 'Fixed fifth'}
+                       'vocal_range': 'Wide', 'vibrato': 0., 'formant': 0., 'harmony_mode': 'Fixed fifth',
+                       'count_in': 0, 'capture_bars': 0, 'loop_mode': 'Replace', 'overdub_feedback': 1.,
+                       'seam_ms': 0}
         self.clock = BeatClock(RATE)
         self.track, self.preview = SamplePlayer(), SamplePlayer()
         self.loops = [LoopTrack(RATE) for _ in range(LOOP_COUNT)]
@@ -300,14 +357,19 @@ class AudioEngine:
             pending = self.clock.pending
             key = action, index if action != 'chord' else 0
             if action == 'clear':
-                pending.pop(('loop', index), None)
-                pending.pop(('restart', index), None)
-            if action == 'loop' and key in pending:
-                del pending[key]
-            elif mode != 'Immediate' and action in ('loop', 'restart', 'chord'):
-                pending[key] = self.clock.boundary(mode), (action, index)
+                for queued in ('loop', 'overdub', 'restart', 'finish'):
+                    self.clock.discard((queued, index))
+            capturing = action in ('loop', 'overdub')
+            if capturing and key in pending:
+                self.clock.discard(key)
+            elif capturing and not self.loops[index].recording and self.params['count_in']:
+                boundary = self.clock.boundary('Next beat' if mode == 'Immediate' else mode)
+                frame = boundary + round(self.params['count_in'] * 4 * self.clock.period)
+                self.clock.queue_at(key, (action, index), frame, keep_beats=True)
+            elif mode != 'Immediate' and action in ('loop', 'overdub', 'restart', 'chord'):
+                self.clock.queue_at(key, (action, index), self.clock.boundary(mode))
             else:
-                pending.pop(key, None)
+                self.clock.discard(key)
                 self._apply_command(action, index)
 
     def _apply_command(self, action, index):
@@ -315,11 +377,25 @@ class AudioEngine:
             self.params['chord'] = index
             return
         track = self.loops[index]
-        if action == 'loop':
-            for other in self.loops:
+        if action in ('loop', 'overdub'):
+            self.clock.discard(('finish', index))
+            for other_index, other in enumerate(self.loops):
                 if other is not track and other.recording:
                     other.toggle()
-            track.toggle()
+                    self.clock.discard(('finish', other_index))
+            if track.recording:
+                track.toggle()
+            elif track.clip is not None and (action == 'overdub' or self.params['loop_mode'] == 'Overdub'):
+                track.start_overdub(self.params['overdub_feedback'])
+            elif action == 'loop':
+                track.toggle()
+            bars = self.params['capture_bars']
+            if track.recording and bars:
+                size = len(track.clip) if track.overdubbing else round(bars * 4 * self.clock.period)
+                self.clock.queue_at(('finish', index), ('finish', index), self.clock.frame + size, keep_beats=True)
+        elif action == 'finish':
+            if track.recording:
+                track.toggle()
         elif action == 'clear':
             track.clear()
             track.previous = None
@@ -329,6 +405,8 @@ class AudioEngine:
             track.position = 0
         elif action == 'undo':
             track.undo()
+        elif action == 'redo':
+            track.redo()
 
     def tune_vocal(self, audio, p, chord, detected):
         pitch = self.analysis.pitch
@@ -360,7 +438,8 @@ class AudioEngine:
         end = clock.frame + len(audio)
         offset = 0
         blocks = []
-        for key, (frame, command) in sorted(clock.pending.items(), key=lambda item: item[1][0]):
+        while clock.pending:
+            key, (frame, command) = min(clock.pending.items(), key=lambda item: item[1][0])
             if frame >= end:
                 break
             size = max(0, frame - clock.frame)
@@ -368,7 +447,7 @@ class AudioEngine:
                 blocks.append(self._render(audio[offset:offset+size]))
                 clock.frame += size
                 offset += size
-            del clock.pending[key]
+            clock.discard(key)
             self._apply_command(*command)
         blocks.append(self._render(audio[offset:]))
         clock.frame = end
@@ -420,6 +499,7 @@ class AudioEngine:
         accompaniment = np.zeros_like(audio)
         loop_stems = []
         for track in self.loops:
+            track.seam_ms = p['seam_ms']
             stem = track.process(capture) * track.gain if track.recording or track.clip is not None else np.zeros_like(audio)
             accompaniment += stem
             loop_stems.append(stem)
@@ -432,7 +512,9 @@ class AudioEngine:
             recorder.write(mix, stems, self.clock.frame, origins)
         heard = dry * p['gain'] if p['monitor'] == 'Dry mic' else vocal
         preview = self.preview.read(len(audio)) * .65
-        click = self.clock.click(len(audio)) if p['metronome'] else 0
+        counting = any(key[0] in ('loop', 'overdub') and key in self.clock.beat_targets
+                       for key in self.clock.pending)
+        click = self.clock.click(len(audio)) if p['metronome'] or counting else 0
         output = np.tanh((heard + accompaniment + preview + click) * p['master']).astype(np.float32)
         if self.muted:
             output.fill(0)
@@ -521,6 +603,7 @@ class AudioEngine:
             while not self.commands.empty():
                 self.commands.get_nowait()
             self.clock.pending.clear()
+            self.clock.beat_targets.clear()
         return self.stop_recording()
 
     def start_recording(self, path, stems=False, align=False):

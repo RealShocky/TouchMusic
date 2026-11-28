@@ -26,7 +26,7 @@ def main():
             'Import your own voice references. Read README.md for MIDI and FL Studio setup.\n')
     checksums = []
     for file in sorted(OUTPUT.iterdir()):
-        if file.name.endswith(('.whl', '.tar.gz', '.zip')):
+        if VERSION in file.name and file.name.endswith(('.whl', '.tar.gz', '.zip')):
             with file.open('rb') as source:
                 checksums.append(hashlib.file_digest(source, 'sha256').hexdigest() + '  ' + file.name)
     (OUTPUT / 'SHA256SUMS.txt').write_text('\n'.join(checksums) + '\n', encoding='utf-8')

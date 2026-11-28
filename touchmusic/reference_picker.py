@@ -1,16 +1,16 @@
 """Listen to a full recording and choose the short reference used by the model."""
 from pathlib import Path
-import numpy as np
-import soundfile as sf
 from PySide6.QtCore import Qt, QThread, QTimer, QUrl, Signal
 from PySide6.QtMultimedia import QAudioOutput, QMediaDevices, QMediaPlayer
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
     QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollBar, QSlider, QVBoxLayout)
 from .waveform import Waveform, time_label
+from .reference_quality import analyze_reference
 
 
 class WaveformLoader(QThread):
     loaded = Signal(float, object)
+    qualityLoaded = Signal(object)
     failed = Signal(str)
 
     def __init__(self, path, parent=None):
@@ -19,19 +19,11 @@ class WaveformLoader(QThread):
 
     def run(self):
         try:
-            with sf.SoundFile(str(self.path)) as source:
-                if source.frames < source.samplerate:
-                    raise ValueError('Choose a recording at least one second long.')
-                frames_per_peak = max(1, int(np.ceil(source.frames / 4000)))
-                peaks = []
-                for block in source.blocks(blocksize=frames_per_peak, dtype='float32', always_2d=True):
-                    if self.isInterruptionRequested():
-                        return
-                    mono = block.mean(axis=1)
-                    if not np.isfinite(mono).all():
-                        raise ValueError('This audio contains invalid samples.')
-                    peaks.append((mono.min(), mono.max()))
-                self.loaded.emit(source.frames / source.samplerate, np.asarray(peaks, np.float32))
+            result = analyze_reference(self.path, self.isInterruptionRequested)
+            if result is not None and not self.isInterruptionRequested():
+                duration, peaks, quality = result
+                self.loaded.emit(duration, peaks)
+                self.qualityLoaded.emit(quality)
         except Exception as exc:
             self.failed.emit(str(exc))
 
@@ -43,8 +35,12 @@ class ReferencePicker(QDialog):
         self.setWindowTitle('Choose voice reference')
         self.resize(900, 560)
         self.ready = False
+        self.closing = False
+        self.quality = None
+        self.candidate_index = -1
         self.preview_selection = False
         self.pending_play = False
+        self.song_pending = False
         self.player = QMediaPlayer(self)
         self.audio_output = QAudioOutput(self)
         self.audio_output.setVolume(.6)
@@ -104,6 +100,21 @@ class ReferencePicker(QDialog):
         self.section_label = QLabel()
         selection.addWidget(self.section_label, 1)
         layout.addLayout(selection)
+        suggestions = QHBoxLayout()
+        self.suggest_button = self.button('Suggest section', self.suggest_section, suggestions)
+        self.next_button = self.button('Next suggestion', self.next_suggestion, suggestions)
+        self.suggestion_label = QLabel('Checking recording levels.')
+        self.suggestion_label.setWordWrap(True)
+        suggestions.addWidget(self.suggestion_label, 1)
+        layout.addLayout(suggestions)
+        self.quality_label = QLabel('Selection quality is being checked.')
+        self.quality_label.setWordWrap(True)
+        layout.addWidget(self.quality_label)
+        quality_hint = QLabel('Suggestions use level, silence, and clipping checks. Listen for clear solo vocals.')
+        quality_hint.setWordWrap(True)
+        layout.addWidget(quality_hint)
+        self.suggest_button.setEnabled(False)
+        self.next_button.setEnabled(False)
         name_row = QHBoxLayout()
         name_row.addWidget(QLabel('Voice name'))
         self.name = QLineEdit(self.path.stem.replace('_', ' '))
@@ -141,6 +152,7 @@ class ReferencePicker(QDialog):
         self.selection_button.setEnabled(False)
         self.loader = WaveformLoader(self.path, self)
         self.loader.loaded.connect(self.loaded)
+        self.loader.qualityLoaded.connect(self.quality_loaded)
         self.loader.failed.connect(self.status.setText)
         self.loader.start()
 
@@ -161,6 +173,8 @@ class ReferencePicker(QDialog):
         return spin
 
     def loaded(self, duration, peaks):
+        if self.closing:
+            return
         self.ready = True
         self.start.setRange(0, max(0, duration - 1))
         self.length.setMaximum(min(8, duration))
@@ -168,11 +182,39 @@ class ReferencePicker(QDialog):
         self.timeline.setRange(0, int(duration * 1000))
         self.duration_label.setText(time_label(duration))
         self.update_scroll()
-        self.player.setSource(QUrl.fromLocalFile(str(self.path.resolve())))
         self.play_button.setEnabled(True)
         self.selection_button.setEnabled(True)
         self.use_button.setEnabled(True)
         self.status.setText('Drag the green section or its edges. Use the full-track slider to find another part.')
+
+    def quality_loaded(self, quality):
+        if self.closing:
+            return
+        self.quality = quality
+        available = bool(quality.candidates)
+        self.suggest_button.setEnabled(available)
+        self.next_button.setEnabled(len(quality.candidates) > 1)
+        self.suggestion_label.setText(f'{len(quality.candidates)} sections suggested.' if available else
+                                     'No section passed the level checks. Choose a section manually.')
+        self.update_quality()
+
+    def update_quality(self):
+        if self.quality is not None:
+            self.quality_label.setText(self.quality.report(self.waveform.start, self.waveform.end).text())
+
+    def suggest_section(self):
+        self.candidate_index = -1
+        self.next_suggestion()
+
+    def next_suggestion(self):
+        if self.quality is None or not self.quality.candidates:
+            return
+        self.candidate_index = (self.candidate_index + 1) % len(self.quality.candidates)
+        start, end = self.quality.candidates[self.candidate_index]
+        self.waveform.set_selection(start, end)
+        self.waveform.show_selection()
+        self.suggestion_label.setText(f'Suggestion {self.candidate_index + 1} of {len(self.quality.candidates)}. '
+                                     'Preview this section before using it.')
 
     def update_scroll(self):
         self.scroll.blockSignals(True)
@@ -187,6 +229,7 @@ class ReferencePicker(QDialog):
             widget.setValue(value)
             widget.blockSignals(False)
         self.section_label.setText(f'{time_label(start)} – {time_label(end)}')
+        self.update_quality()
         if self.preview_selection and self.player.playbackState() == QMediaPlayer.PlayingState:
             self.player.setPosition(round(start * 1000))
 
@@ -196,7 +239,8 @@ class ReferencePicker(QDialog):
 
     def seek(self, seconds):
         self.preview_selection = False
-        self.player.setPosition(round(seconds * 1000))
+        if not self.player.source().isEmpty():
+            self.player.setPosition(round(seconds * 1000))
         self.waveform.position = seconds
         if seconds < self.waveform.view_start or seconds > self.waveform.view_start + self.waveform.view_seconds:
             self.waveform.scroll_to(seconds - self.waveform.view_seconds * .5)
@@ -205,7 +249,7 @@ class ReferencePicker(QDialog):
 
     def use_playhead(self):
         if self.ready:
-            start = min(self.player.position() / 1000, self.waveform.duration - 1)
+            start = min(self.waveform.position, self.waveform.duration - 1)
             length = min(8, self.waveform.duration - start)
             self.waveform.set_selection(start, start + length)
             self.waveform.show_selection()
@@ -216,12 +260,21 @@ class ReferencePicker(QDialog):
         elif self.ready:
             self.preview_selection = False
             self.pending_play = False
+            if self.player.source().isEmpty():
+                self.song_pending = True
+                self.player.setSource(QUrl.fromLocalFile(str(self.path.resolve())))
+                return
             if self.player.position() >= round(self.waveform.duration * 1000) - 50:
                 self.player.setPosition(0)
             self.player.play()
 
     def play_selection(self):
         if self.ready:
+            self.song_pending = False
+            if self.player.source().isEmpty():
+                self.pending_play = True
+                self.player.setSource(QUrl.fromLocalFile(str(self.path.resolve())))
+                return
             if self.player.mediaStatus() in (QMediaPlayer.LoadingMedia, QMediaPlayer.NoMedia):
                 self.pending_play = True
                 self.player.play()
@@ -246,7 +299,13 @@ class ReferencePicker(QDialog):
             self.timeline.setValue(position)
 
     def media_status(self, status):
-        if self.pending_play and status in (QMediaPlayer.LoadedMedia, QMediaPlayer.BufferedMedia):
+        if self.closing:
+            return
+        if self.song_pending and status in (QMediaPlayer.LoadedMedia, QMediaPlayer.BufferedMedia):
+            self.song_pending = False
+            self.player.setPosition(round(self.waveform.position * 1000))
+            self.player.play()
+        elif self.pending_play and status in (QMediaPlayer.LoadedMedia, QMediaPlayer.BufferedMedia):
             QTimer.singleShot(0, self.play_selection)
         elif status == QMediaPlayer.EndOfMedia and self.preview_selection and self.loop_preview.isChecked():
             QTimer.singleShot(0, self.play_selection)
@@ -264,9 +323,12 @@ class ReferencePicker(QDialog):
             return
         self.preview_selection = False
         self.pending_play = False
+        self.song_pending = False
         self.ready = False
+        self.closing = True
         self.player.stop()
-        self.player.setSource(QUrl())
+        if not self.player.source().isEmpty():
+            self.player.setSource(QUrl())
         self.loader.requestInterruption()
         self.loader.wait()
         super().done(result)

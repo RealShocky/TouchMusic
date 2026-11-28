@@ -14,6 +14,7 @@ class BeatClock:
         self.bpm = 120
         self.mode = 'Immediate'
         self.pending = {}
+        self.beat_targets = {}
         time = np.arange(round(rate * .025)) / rate
         self.clicks = tuple((.16 * np.sin(2 * np.pi * hz * time) * np.exp(-220 * time)).astype(np.float32)
                             for hz in (1500, 1050))
@@ -35,7 +36,20 @@ class BeatClock:
             self.origin = round(self.frame - position * self.period)
         self.mode = mode
         for key, (_, command) in self.pending.items():
-            self.pending[key] = self.boundary(mode), command
+            target = self.beat_targets.get(key)
+            frame = self.boundary(mode) if target is None else self.origin + round(target * self.period)
+            self.pending[key] = frame, command
+
+    def discard(self, key):
+        self.pending.pop(key, None)
+        self.beat_targets.pop(key, None)
+
+    def queue_at(self, key, command, frame, keep_beats=False):
+        self.pending[key] = frame, command
+        if keep_beats:
+            self.beat_targets[key] = (frame - self.origin) / self.period
+        else:
+            self.beat_targets.pop(key, None)
 
     def boundary(self, mode):
         if mode == 'Immediate':

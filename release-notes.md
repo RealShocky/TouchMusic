@@ -1,23 +1,21 @@
-# TouchMusic 0.1.0
+# TouchMusic 0.2.0
 
-First public release of the standalone Windows vocal and gesture instrument.
+Standalone performance and session upgrades.
 
-- Reference-import player with waveform, zoom, and draggable 1–8 second voice selection.
-- Live pitch correction, vocal effects, local Seed-VC character conversion, and chord pad.
-- Four-track looper with tap tempo, metronome, and beat/bar scheduling.
-- Gesture-to-MIDI CC, notes, and chords for FL Studio and other DAWs.
-- Portable skits, WAV stems, and automatic vocal alignment.
-- Installable Python wheel and command-line launcher.
+- Reference-quality reports and suggested 1-8 second sections, with manual audition and selection.
+- Loop overdubbing with adjustable feedback and four levels of committed-take undo/redo.
+- One- or two-bar count-in and exact 1/2/4/8-bar capture, including automatic stop.
+- Background recovery of completed loops, backing, voice references, and settings.
+- Ordered setlists with per-song skit recall and Next/Previous song gesture actions.
+- Optional loop-edge fades, progress bars, countdowns, and clearer capture status.
+- Preview media loads when auditioning, reducing unnecessary player work during reference analysis.
 
-## Download choices
+## Downloads
 
-- **TouchMusic-0.1.0-Windows-Setup.zip** is the full source setup folder. Install 64-bit Python 3.11 and Git, extract it, run Setup.cmd, then Launch.cmd. Setup downloads dependencies and the optional singing runtime.
-- **touchmusic-0.1.0-py3-none-any.whl** installs with Python 3.11 using pip. Run touchmusic to launch the desktop app and touchmusic --setup-ai to install the optional singing engine.
-- **touchmusic-0.1.0.tar.gz** is the Python source distribution.
-- **SHA256SUMS.txt** provides SHA-256 checksums.
+The Windows Setup ZIP requires 64-bit Python 3.11 and Git. Extract, run Setup.cmd once, then Launch.cmd. Dependencies and the optional singing runtime download during setup. This is a setup archive, not a dependency-free executable.
 
-Bring your own reference audio. Personal voices, recordings, model weights, and caches are excluded.
+Alternatively: `py -3.11 -m pip install --upgrade touchmusic`, then run `touchmusic`. Install the optional character engine with `touchmusic --setup-ai`.
 
-On Windows, create a virtual MIDI port in loopMIDI and enable it in FL Studio. In TouchMusic, open MIDI / FL, connect that port, then map gestures to MIDI CC, notes, or a chord. MIDI transports control messages. Use the documented audio route to send vocals into FL Studio.
+Personal voices, recordings, model weights, and caches are excluded. Reference suggestions use level heuristics, not vocal isolation. Recovery excludes active capture and undo history. Setlist song recall stops audio and disarms gestures. Live FL Studio routing validation is pending.
 
-PyPI publication requires a trusted publisher configured by the PyPI project owner. Until published there, install the wheel from this release.
+Automated behavior tests, desktop layout checks, and package installation are checked for this release. SHA256SUMS.txt accompanies the release artifacts.

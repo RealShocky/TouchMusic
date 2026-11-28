@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QSlider, QFileDialog, QMessageBox, QInputDialog,
-    QProgressBar, QCheckBox, QGroupBox, QGridLayout, QSpinBox, QDialog, QScrollArea, QTabWidget, QSizePolicy)
+    QProgressBar, QCheckBox, QGroupBox, QGridLayout, QSpinBox, QDialog, QScrollArea, QTabWidget, QSizePolicy, QMenu)
 from .audio import AudioEngine, LOOP_COUNT, RATE
 from .library import VoiceLibrary, DATA, save_json, read_audio
 from .camera import CameraWorker
@@ -23,6 +23,8 @@ from .vocal import HARMONY_MODES, VOCAL_RANGES
 from .reference_picker import ReferencePicker
 from .midi import MidiOutput, MIDI_ACTIONS, MIDI_CHORDS, MIDI_LEVELS, MIDI_NOTES
 from .midi_dialog import MidiDialog
+from .sessions import SessionRecovery
+from .setlist_dialog import SetlistDialog
 
 EFFECT_TARGETS = ['None', 'Reverb', 'Delay', 'Harmony', 'Robot', 'Pitch', 'Gain',
                   'Chorus', 'Drive', 'Radio', 'Octave', 'Tremolo', 'Warmth',
@@ -42,8 +44,8 @@ BUILTIN_PRESETS = {
 LOOP_ACTIONS = {
     f'{label} {i+1}': (command, i)
     for i in range(LOOP_COUNT)
-    for label, command in [('Capture loop', 'loop'), ('Mute loop', 'mute'), ('Restart loop', 'restart'),
-                           ('Undo loop', 'undo')]
+    for label, command in [('Capture loop', 'loop'), ('Overdub loop', 'overdub'), ('Mute loop', 'mute'),
+                           ('Restart loop', 'restart'), ('Undo loop', 'undo'), ('Redo loop', 'redo')]
 }
 CHORD_ACTIONS = [f'Chord {degree}' for degree in DEGREES]
 TUNE_PRESETS = {'Natural': (55, 30), 'Tight': (80, 60), 'Hard': (100, 100)}
@@ -51,7 +53,8 @@ ACTIONS = ['None', *VOICE_SLOTS, 'Next voice', 'Previous voice', 'Loop', *LOOP_A
            'Next loop', 'Previous loop', 'Mute output', 'AI conversion', 'Dialogue mode',
            'Play / pause track', 'Restart track', 'Record performance', *BUILTIN_PRESETS,
            *CHORD_ACTIONS, 'Next chord', 'Previous chord', 'Toggle chords', 'Toggle Auto-Tune',
-           'Toggle dry monitoring', 'Undo selected loop', 'Toggle metronome', 'Tap tempo', *MIDI_ACTIONS]
+           'Toggle dry monitoring', 'Undo selected loop', 'Redo selected loop', 'Overdub selected loop',
+           'Next song', 'Previous song', 'Toggle metronome', 'Tap tempo', *MIDI_ACTIONS]
 EFFECT_DEFAULTS = {'gain': 70, 'aimix': 100, 'delaytime': 300, 'feedback': 29}
 TARGET_KEYS = {'AI mix': 'aimix', 'Delay time': 'delaytime', 'Master level': 'master',
                'Tune strength': 'tune', 'Retune speed': 'retune', 'Chord level': 'chord_level'}
@@ -59,10 +62,10 @@ SCENE_PREFIX = 'Scene · '
 
 STYLE = '''
 QMainWindow, QWidget { background: #14191c; color: #f3f1e9; font-family: 'Segoe UI'; font-size: 13px; }
-QGroupBox { background: #1b2226; border: 1px solid #394448; border-radius: 8px; margin-top: 12px; padding: 12px 10px 8px; font-weight: 600; }
+QGroupBox { background: #1b2226; border: 1px solid #394448; border-radius: 8px; margin-top: 12px; padding: 8px 10px 6px; font-weight: 600; }
 QGroupBox::title { subcontrol-origin: margin; left: 14px; padding: 0 5px; }
 QLabel { background: transparent; }
-QPushButton { background: #293337; border: 1px solid #435158; border-radius: 5px; padding: 6px 10px; }
+QPushButton { background: #293337; border: 1px solid #435158; border-radius: 5px; padding: 4px 10px; }
 QPushButton:hover { background: #39484e; }
 QPushButton:checked { background: #1d4d44; border-color: #77d5b8; }
 QPushButton#startAudio { background: #8fe1c4; color: #0b221a; border-color: #a3e8d1; font-weight: 700; }
@@ -145,6 +148,11 @@ class MainWindow(QMainWindow):
             except (ValueError, OSError):
                 pass
         self.saved_presets = self.settings.get('presets', {})
+        self.recovery = SessionRecovery(DATA / 'recovery')
+        self.recovery_pending = self.recovery.recovery_available
+        self.recovery_fingerprint = None
+        self.recovery_changed_at = time.monotonic()
+        self.last_recovery_check = 0.
         root = QWidget()
         page = QScrollArea()
         page.setWidgetResizable(True)
@@ -152,14 +160,24 @@ class MainWindow(QMainWindow):
         page.setWidget(root)
         self.setCentralWidget(page)
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setContentsMargins(24, 12, 24, 12)
+        layout.setSpacing(4)
         header = QHBoxLayout()
         title = QLabel('TouchMusic')
         title.setStyleSheet('font-size: 31px; font-weight: 650;')
         header.addWidget(title)
         header.addStretch()
-        self.button('Open skit', self.open_skit, header)
-        self.button('Save skit', self.save_skit, header)
+        session_button = QPushButton('Session')
+        self.session_menu = QMenu(self)
+        self.session_menu.addAction('Open skit…', self.open_skit)
+        self.session_menu.addAction('Save skit…', self.save_skit)
+        self.session_menu.addAction('Setlist…', self.open_setlist)
+        self.session_menu.addSeparator()
+        self.session_menu.addAction('Save recovery now', lambda: self.backup_session(force=True))
+        self.recover_action = self.session_menu.addAction('Recover last session', self.restore_recovery)
+        self.session_menu.aboutToShow.connect(lambda: self.recover_action.setEnabled(self.recovery.archive_path.exists()))
+        session_button.setMenu(self.session_menu)
+        header.addWidget(session_button)
         self.button('Music tools', self.open_music_tools, header)
         self.button('MIDI / FL', self.open_midi_dialog, header)
         self.audio_button = self.button('Start audio', self.toggle_audio, header)
@@ -172,7 +190,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.music_status)
         self.notice = QLabel('Choose your microphone and output, then start audio. Use headphones for live monitoring.')
         self.notice.setWordWrap(True)
-        layout.addWidget(self.notice)
+        notices = QHBoxLayout()
+        notices.addWidget(self.notice, 1)
+        self.recover_button = self.button('Recover session', self.restore_recovery, notices)
+        self.keep_button = self.button('Use current session', self.use_current_session, notices)
+        self.recover_button.setVisible(self.recovery_pending)
+        self.keep_button.setVisible(self.recovery_pending)
+        layout.addLayout(notices)
         devices = QHBoxLayout()
         self.inputs, self.outputs = QComboBox(), QComboBox()
         for combo in (self.inputs, self.outputs):
@@ -187,6 +211,8 @@ class MainWindow(QMainWindow):
         layout.addLayout(devices)
         body = QHBoxLayout()
         left, right = QVBoxLayout(), QVBoxLayout()
+        left.setSpacing(4)
+        right.setSpacing(4)
         body.addLayout(left, 3)
         body.addLayout(right, 2)
         layout.addLayout(body, 1)
@@ -229,6 +255,7 @@ class MainWindow(QMainWindow):
         self.gesture_dialog.layout().insertWidget(1, mapping_box)
         voice_box = QGroupBox('Character voice')
         voice_layout = QVBoxLayout(voice_box)
+        voice_layout.setSpacing(4)
         self.voice_combo = QComboBox()
         self.voice_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.voice_combo.setMinimumContentsLength(16)
@@ -264,7 +291,7 @@ class MainWindow(QMainWindow):
         right.addLayout(tuning_row)
         vocal_tabs = QTabWidget()
         vocal_tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
-        vocal_tabs.setMinimumHeight(208)
+        vocal_tabs.setMinimumHeight(180)
         pitch_box = QWidget()
         pitch_layout = QVBoxLayout(pitch_box)
         self.pitch_status = QLabel('Auto-Tune off')
@@ -320,6 +347,7 @@ class MainWindow(QMainWindow):
         right.addWidget(vocal_tabs, 1)
         transport = QGroupBox('Looper and transport')
         transport_layout = QVBoxLayout(transport)
+        transport_layout.setSpacing(4)
         self.build_transport(transport_layout)
         track_row = QHBoxLayout()
         self.button('Open track', self.open_track, track_row)
@@ -342,6 +370,7 @@ class MainWindow(QMainWindow):
         self.button('Export loop', self.export_loop, row)
         self.button('Clear loop', lambda: self.loop_command('clear'), row)
         self.undo_button = self.button('Undo', lambda: self.loop_command('undo'), row)
+        self.redo_button = self.button('Redo', lambda: self.loop_command('redo'), row)
         self.record_button = self.button('Record performance', self.toggle_recording, row)
         for track, level in zip(self.engine.loops, self.settings.get('loop_levels', [])):
             track.gain = max(0, min(100, level)) / 100
@@ -360,9 +389,15 @@ class MainWindow(QMainWindow):
         pitch_layout.addStretch()
         self.midi_dialog = MidiDialog(self.midi, self.settings.get('midi', {}), self)
         self.midi_dialog.finished.connect(self.save_settings)
+        self.setlist_dialog = SetlistDialog(self)
+        stored_setlist = self.settings.get('setlist_file')
+        if stored_setlist and Path(stored_setlist).is_file():
+            self.setlist_dialog.load_list(stored_setlist)
         self.apply_music(self.settings.get('music', {}))
         self.refresh_devices()
         self.refresh_voices()
+        if self.recovery_pending:
+            self.notice.setText('An unfinished session has a recovery backup. Recover it or choose Use current session.')
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.timer.start(100)
@@ -431,8 +466,50 @@ class MainWindow(QMainWindow):
         controls.addWidget(self.beat_status)
         controls.addStretch()
         layout.addLayout(controls)
+        capture_row = QHBoxLayout()
+        mode = QComboBox()
+        mode.addItems(['Replace', 'Overdub'])
+        mode.setToolTip('Replace records a fresh take. Overdub adds to an existing loop. Click its pad again to finish.')
+        mode.currentTextChanged.connect(lambda value: self.set_music('loop_mode', value))
+        self.music_controls['loop_mode'] = mode
+        capture_row.addWidget(QLabel('Capture'))
+        capture_row.addWidget(mode)
+        count = QSpinBox()
+        count.setRange(0, 2)
+        count.setSuffix(' bars')
+        count.valueChanged.connect(lambda value: self.set_music('count_in', value))
+        self.music_controls['count_in'] = count
+        capture_row.addWidget(QLabel('Count-in'))
+        capture_row.addWidget(count)
+        length = QComboBox()
+        length.addItem('Free length', 0)
+        for bars in (1, 2, 4, 8):
+            length.addItem(f'{bars} bar' if bars == 1 else f'{bars} bars', bars)
+        length.currentIndexChanged.connect(lambda _: self.set_music('capture_bars', length.currentData()))
+        self.music_controls['capture_bars'] = length
+        capture_row.addWidget(length)
+        feedback = QSpinBox()
+        feedback.setRange(0, 100)
+        feedback.setValue(100)
+        feedback.setSuffix('%')
+        feedback.setToolTip('Existing-layer level kept on each overdub pass. 100% keeps it unchanged.')
+        feedback.valueChanged.connect(lambda value: self.set_music('overdub_feedback', value))
+        self.music_controls['overdub_feedback'] = feedback
+        capture_row.addWidget(QLabel('Layer feedback'))
+        capture_row.addWidget(feedback)
+        seam = QSpinBox()
+        seam.setRange(0, 20)
+        seam.setSuffix(' ms')
+        seam.setToolTip('Short fade at each loop edge reduces clicks without changing its length.')
+        seam.valueChanged.connect(lambda value: self.set_music('seam_ms', value))
+        self.music_controls['seam_ms'] = seam
+        capture_row.addWidget(QLabel('Edge fade'))
+        capture_row.addWidget(seam)
+        capture_row.addStretch()
+        layout.addLayout(capture_row)
         pads = QHBoxLayout()
         self.loop_pads = []
+        self.loop_progress = []
         self.pad_levels = []
         self.pad_mutes = []
         for index in range(LOOP_COUNT):
@@ -440,6 +517,14 @@ class MainWindow(QMainWindow):
             capture = self.button(f'Loop {index+1}', lambda _, i=index: self.loop_command('loop', i), column)
             capture.setMinimumHeight(38)
             self.loop_pads.append(capture)
+            progress = QProgressBar()
+            progress.setRange(0, 1000)
+            progress.setValue(0)
+            progress.setTextVisible(False)
+            progress.setFixedHeight(5)
+            progress.setAccessibleName(f'Loop {index+1} playback progress')
+            self.loop_progress.append(progress)
+            column.addWidget(progress)
             mix = QHBoxLayout()
             level = QSlider(Qt.Horizontal)
             level.setRange(0, 100)
@@ -542,6 +627,10 @@ class MainWindow(QMainWindow):
         self.midi_dialog.show()
         self.midi_dialog.raise_()
 
+    def open_setlist(self):
+        self.setlist_dialog.show()
+        self.setlist_dialog.raise_()
+
     def map_left_chords(self):
         for index, action in enumerate(CHORD_ACTIONS[:5], 1):
             self.mappings[f'Left_{index}'].setCurrentText(action)
@@ -559,6 +648,8 @@ class MainWindow(QMainWindow):
                 self.engine.converter.set_quality(value)
         elif key == 'chord' and self.engine.stream:
             self.engine.commands.put(('chord', value))
+        elif key == 'overdub_feedback':
+            self.engine.params[key] = value / 100
         elif key not in ('stems', 'align_ai'):
             self.engine.params[key] = value
 
@@ -728,64 +819,121 @@ class MainWindow(QMainWindow):
         if not path.lower().endswith('.touchmusic'):
             path += '.touchmusic'
         try:
-            settings = self.performance_settings()
-            settings.update(track_name=self.track_label.text(), ai=self.ai.isChecked() or self.ai_requested,
-                            loop_selected=self.loop_select.currentIndex(),
-                            muted_loops=[loop.muted for loop in self.engine.loops],
-                            scenes=self.saved_presets)
-            assets = {f'loop-{index}': loop.clip for index, loop in enumerate(self.engine.loops, 1)
-                      if loop.clip is not None}
-            if len(self.engine.track.audio):
-                assets['backing'] = self.engine.track.audio
-            identities = {settings['voice'], *settings['voice_slots'].values()}
-            for scene in self.saved_presets.values():
-                identities.update([scene.get('voice'), *scene.get('voice_slots', {}).values()])
-            voices = [(voice, self.library.path(voice)) for voice in self.voices if voice['id'] in identities]
+            settings, assets, voices = self.session_snapshot()
             save_project(path, settings, assets, voices)
             self.notice.setText(f'Skit saved to {path}')
         except Exception as exc:
             self.error(exc)
 
+    def session_snapshot(self):
+        settings = self.performance_settings()
+        settings.update(track_name=self.track_label.text(), ai=self.ai.isChecked() or self.ai_requested,
+                        loop_selected=self.loop_select.currentIndex(),
+                        muted_loops=[loop.muted for loop in self.engine.loops],
+                        scenes=self.saved_presets)
+        assets = {f'loop-{index}': loop.clip for index, loop in enumerate(self.engine.loops, 1)
+                  if loop.clip is not None}
+        if len(self.engine.track.audio):
+            assets['backing'] = self.engine.track.audio
+        identities = {settings['voice'], *settings['voice_slots'].values()}
+        for scene in self.saved_presets.values():
+            identities.update([scene.get('voice'), *scene.get('voice_slots', {}).values()])
+        voices = [(voice, self.library.path(voice)) for voice in self.voices
+                  if voice['id'] in identities and voice.get('file') and self.library.path(voice).is_file()]
+        return settings, assets, voices
+
     def open_skit(self):
+        path, _ = QFileDialog.getOpenFileName(self, 'Open skit', '', 'TouchMusic skit (*.touchmusic)')
+        if path:
+            self.load_skit_path(path)
+
+    def load_skit_path(self, path):
         if self.engine.recorder or any(loop.recording for loop in self.engine.loops):
             self.notice.setText('Finish recording before opening a skit.')
-            return
-        path, _ = QFileDialog.getOpenFileName(self, 'Open skit', '', 'TouchMusic skit (*.touchmusic)')
-        if not path:
+            return False
+        try:
+            self.apply_session(*load_project(path))
+            self.notice.setText(f'Opened {Path(path).name}. Start audio when ready.')
+            return True
+        except Exception as exc:
+            self.notice.setText('Could not open skit: ' + str(exc))
+            return False
+
+    def apply_session(self, settings, assets, voices):
+        if self.engine.stream:
+            self.toggle_audio()
+        self.arm.setChecked(False)
+        self.library.restore_references(voices)
+        self.refresh_voices()
+        for name, scene in settings.get('scenes', {}).items():
+            self.saved_presets[name] = scene
+            if self.preset_combo.findText(name, Qt.MatchFixedString) < 0:
+                self.preset_combo.addItem(name)
+                for selector in self.gesture_selectors:
+                    selector.addItem(SCENE_PREFIX + name)
+        self.preset_combo.setCurrentText('Custom')
+        for index, loop in enumerate(self.engine.loops, 1):
+            loop.load(assets.get(f'loop-{index}'))
+            loop.previous = None
+            loop.muted = False
+        for loop, muted in zip(self.engine.loops, settings.get('muted_loops', [])):
+            loop.muted = bool(muted)
+        self.engine.track.load(assets.get('backing', np.zeros(0, np.float32)))
+        self.track_label.setText(settings.get('track_name', 'Backing track') if 'backing' in assets else 'No backing track loaded')
+        self.loop_select.setCurrentIndex(settings.get('loop_selected', 0))
+        self.apply_performance(settings)
+        self.ai.setChecked(False)
+        self.ai_requested = bool(settings.get('ai'))
+
+    def use_current_session(self):
+        self.recovery_pending = False
+        self.recover_button.hide()
+        self.keep_button.hide()
+        self.recovery_fingerprint = None
+        self.notice.setText('Current session selected. Automatic recovery saves are enabled.')
+
+    def restore_recovery(self):
+        if self.engine.recorder or any(loop.recording for loop in self.engine.loops):
+            self.notice.setText('Finish recording before recovering a session.')
             return
         try:
-            settings, assets, voices = load_project(path)
-            if self.engine.stream:
-                self.toggle_audio()
-            self.arm.setChecked(False)
-            self.library.restore_references(voices)
-            self.refresh_voices()
-            for name, scene in settings.get('scenes', {}).items():
-                self.saved_presets[name] = scene
-                if self.preset_combo.findText(name, Qt.MatchFixedString) < 0:
-                    self.preset_combo.addItem(name)
-                    for selector in self.gesture_selectors:
-                        selector.addItem(SCENE_PREFIX + name)
-            self.preset_combo.setCurrentText('Custom')
-            for index, loop in enumerate(self.engine.loops, 1):
-                loop.load(assets.get(f'loop-{index}'))
-                loop.previous = None
-                loop.muted = False
-            for loop, muted in zip(self.engine.loops, settings.get('muted_loops', [])):
-                loop.muted = bool(muted)
-            self.engine.track.load(assets.get('backing', np.zeros(0, np.float32)))
-            self.track_label.setText(settings.get('track_name', 'Backing track') if 'backing' in assets else 'No backing track loaded')
-            self.loop_select.setCurrentIndex(settings.get('loop_selected', 0))
-            self.apply_performance(settings)
-            self.ai.setChecked(False)
-            self.ai_requested = bool(settings.get('ai'))
-            self.notice.setText(f'Opened {Path(path).name}. Start audio when ready.')
+            self.apply_session(*self.recovery.load_recovery())
+            self.use_current_session()
+            self.notice.setText('Recovered completed loops and settings. Start audio when ready.')
         except Exception as exc:
-            self.error(exc)
+            self.notice.setText('Recovery failed: ' + str(exc))
+
+    def backup_session(self, force=False):
+        if self.recovery_pending or any(loop.recording for loop in self.engine.loops):
+            if force:
+                self.notice.setText('Choose Recover or Use current session, and finish loop capture before saving recovery.')
+            return
+        now = time.monotonic()
+        if not force and now - self.last_recovery_check < 1:
+            return
+        self.last_recovery_check = now
+        try:
+            settings, assets, voices = self.session_snapshot()
+        except Exception as exc:
+            self.notice.setText('Recovery snapshot failed: ' + str(exc))
+            return
+        fingerprint = (json.dumps(settings, sort_keys=True), tuple((key, id(value)) for key, value in assets.items()))
+        if fingerprint != self.recovery_fingerprint:
+            self.recovery_fingerprint = fingerprint
+            self.recovery_changed_at = now
+        if force or (fingerprint != getattr(self, 'recovery_submitted', None) and now - self.recovery_changed_at >= 3):
+            self.recovery.submit(settings, assets, voices, copy_assets=False)
+            self.recovery_submitted = fingerprint
+            if force:
+                self.notice.setText('Recovery save queued. Completed loops and settings are saved in the background.')
+        if self.recovery.error and self.recovery.error != getattr(self, 'last_recovery_error', ''):
+            self.last_recovery_error = self.recovery.error
+            self.notice.setText('Recovery save failed: ' + self.recovery.error)
 
     def save_settings(self):
         self.settings = {**self.performance_settings(), 'presets': self.saved_presets,
-                         'input': self.inputs.currentText(), 'output': self.outputs.currentText()}
+                         'input': self.inputs.currentText(), 'output': self.outputs.currentText(),
+                         'setlist_file': str(self.setlist_dialog.path or '')}
         save_json(self.settings_path, self.settings)
 
     def refresh_devices(self):
@@ -1041,7 +1189,7 @@ class MainWindow(QMainWindow):
         self.loop_command('loop')
 
     def loop_command(self, action, index=None):
-        if action == 'loop' and not self.engine.stream:
+        if action in ('loop', 'overdub') and not self.engine.stream:
             self.notice.setText('Start audio before capturing a loop.')
             return
         if index is None:
@@ -1092,6 +1240,12 @@ class MainWindow(QMainWindow):
             self.toggle_loop()
         elif action == 'Undo selected loop':
             self.loop_command('undo')
+        elif action == 'Overdub selected loop':
+            self.loop_command('overdub')
+        elif action == 'Redo selected loop':
+            self.loop_command('redo')
+        elif action in ('Next song', 'Previous song'):
+            self.setlist_dialog.step(1 if action == 'Next song' else -1)
         elif action in LOOP_ACTIONS:
             self.loop_command(*LOOP_ACTIONS[action])
         elif action in CHORD_ACTIONS:
@@ -1191,6 +1345,7 @@ class MainWindow(QMainWindow):
 
     def tick(self):
         self.midi.tick()
+        self.backup_session()
         if self.midi.error:
             self.midi_dialog.update_status()
         for recorder in self.pending_exports[:]:
@@ -1208,13 +1363,21 @@ class MainWindow(QMainWindow):
         self.output_meter.setValue(min(100, int(self.engine.peak * 100)))
         track = self.selected_loop()
         self.undo_button.setEnabled(track.previous is not None and not track.recording)
+        self.redo_button.setEnabled(bool(track.future) and not track.recording)
         for index, (loop, pad, mute) in enumerate(zip(self.engine.loops, self.loop_pads, self.pad_mutes)):
             clip = loop.clip
-            if ('loop', index) in self.engine.clock.pending:
-                status = 'Finish queued' if loop.recording else 'Capture queued'
+            self.loop_progress[index].setValue(round(1000 * loop.position / len(clip)) if clip is not None and len(clip) else 0)
+            pending = self.engine.clock.pending
+            key = next((key for key in (('loop', index), ('overdub', index)) if key in pending), None)
+            if key is not None:
+                beats = max(0, (pending[key][0] - self.engine.clock.frame) / self.engine.clock.period)
+                status = ('Finish' if loop.recording else 'Capture') + f' in {beats:.1f} beats'
                 state = 'queued'
             elif loop.recording:
-                status = f'Recording {loop.size / RATE:.1f} s'
+                status = f'{"Overdub" if loop.overdubbing else "Recording"} {loop.size / RATE:.1f} s'
+                if ('finish', index) in pending:
+                    seconds = max(0, (pending[('finish', index)][0] - self.engine.clock.frame) / RATE)
+                    status += f' / {seconds:.1f} s left'
                 state = 'recording'
             elif clip is not None:
                 status = f'{"Muted" if loop.muted else "Playing"} {len(clip) / RATE:.1f} s'
@@ -1291,4 +1454,7 @@ class MainWindow(QMainWindow):
         if self.engine.converter:
             self.engine.converter.close()
         self.save_settings()
+        if not self.recovery_pending:
+            self.backup_session(force=True)
+        self.recovery.close(clean=not self.recovery_pending)
         event.accept()
