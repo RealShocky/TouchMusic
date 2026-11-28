@@ -313,7 +313,7 @@ Open **Plugin Center** to discover installed VST3 paths without loading them. Ad
 
 Third-party effects load/process in an owned worker process. A native crash or timeout stops that worker while TouchMusic continues with time-aligned delayed dry audio. Stop audio, then use **Restart isolated rack** to retry. Populated racks add 2048 scheduled frames, approximately 42.7 ms at 48 kHz, before unknown plugin, AI and device delays. This trades latency for fault containment; it is not a hardware round-trip measurement or full plugin latency compensation.
 
-Stereo effect output is preserved through the master, device output and new stereo performance/stem WAVs. Existing loop capture and backing/reference storage remain mono for archive compatibility. Dialogue mode bypasses vocal effects and the external rack. Instruments and sidechains require separate planned hosting work.
+Stereo effect output is preserved through the master, device output and new stereo performance/stem WAVs. Existing loop capture and backing/reference storage remain mono for archive compatibility. Dialogue mode bypasses vocal effects and the external rack. Instruments use the separate Instruments workspace; sidechain routing remains planned.
 
 Select a parameter and bind **Plugin knob 1..8**, then choose that knob in Gesture mapping. Or start the camera, choose **Gesture Learn**, and deliberately move a hand vertically/horizontally or change thumb-index spread. Learning disarms performance gestures and times out after ten seconds. Arm again when ready to perform.
 

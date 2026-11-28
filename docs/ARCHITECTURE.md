@@ -63,7 +63,7 @@ Current playback is serviced by the 100 ms UI timer. It follows elapsed audio fr
 
 ## DAW and instrument boundaries
 
-The existing VST3 Control Bridge remains version 0.4.0 and retains its protocol/UID/ten controls. It passes DAW audio unchanged and emits bounded automation/timing packets to an opt-in loopback receiver. It is separate from the isolated external-FX worker. Full processed AI audio return and an isolated instrument/MIDI synthesis bus are still planned. Neither is implied by the new Plugin Center.
+The existing VST3 Control Bridge remains version 0.4.0 and retains its protocol/UID/ten controls. It passes DAW audio unchanged and emits bounded automation/timing packets to an opt-in loopback receiver. It is separate from the isolated external-FX worker. Dev2 adds a separate live Audio Bridge and isolated instrument/MIDI synthesis bus, described below. Full latency compensation, extended instrument certification and actual DAW checks remain pending.
 
 ## Compatibility contract
 

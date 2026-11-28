@@ -101,7 +101,7 @@ Authoritative results are in [plugin compatibility matrix](docs/PLUGIN_COMPATIBI
 
 - Vocal candidates: SnapTune, Graillon 3, MAutoPitch, LyraTune, OpenVoxTuner, NoteForge.
 - Effects: TDR Nova, TDR Kotelnikov, Valhalla Supermassive, Dragonfly Reverb, ChowMatrix, BYOD, MFreeFXBundle.
-- Instruments: Surge XT and Cardinal, pending V50-09.
+- Instruments: Surge XT 1.3.4 has a real stereo render check; Cardinal compatibility remains unverified.
 - SDK/host: Steinberg VST3 SDK and Spotify Pedalboard are already used.
 - Pluginval headless validation: Planned. Add a pinned validator and archived logs to CI for our bridge and an optional local validation workflow for installed effects.
 - EnterOutside/vst-loader: Planned reference review; do not import code without a confirmed applicable license.

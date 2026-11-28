@@ -38,8 +38,8 @@ The archive hash is an integrity pin observed during development, not an indepen
 | ChowMatrix | https://github.com/Chowdhury-DSP/ChowMatrix | BSD-3-Clause | None; binary dependencies may have additional terms |
 | BYOD | https://github.com/Chowdhury-DSP/BYOD | GPL-3.0 | None |
 | MFreeFXBundle | https://www.meldaproduction.com/MFreeFXBundle | Proprietary free edition | None; verify individual effects |
-| Surge XT | https://github.com/surge-synthesizer/surge | GPL-3.0 | None; dedicated instrument bus planned |
-| Cardinal | https://github.com/DISTRHO/Cardinal | GPL-3.0 / bundled component terms | None; dedicated instrument bus planned |
+| Surge XT | https://github.com/surge-synthesizer/surge | GPL-3.0 | See dev2 results below; instrument hosting exists and vendor compatibility remains specific to each tested binary |
+| Cardinal | https://github.com/DISTRHO/Cardinal | GPL-3.0 / bundled component terms | See dev2 results below; instrument hosting exists and vendor compatibility remains specific to each tested binary |
 
 No third-party plugin binaries are distributed in TouchMusic. Source license labels are not blanket permission to redistribute every release binary, artwork or dependency. Catalog downloads use official sources; unsupported/unreviewed assets open publisher pages.
 
